@@ -9,20 +9,26 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"sync/atomic"
 	"time"
 
-	"git.woa.com/kefuai/mini-router/pkg/proto/routingpb"
 	"git.woa.com/mfcn/ms-go/pkg/mlog"
 	"git.woa.com/mfcn/ms-go/pkg/util"
 	"github.com/samber/lo"
 	"go.uber.org/zap"
 )
 
+const (
+	eidHeader = "eid"
+)
+
 var (
 	sdkPathPattern = regexp.MustCompile(`^/(provider|consumer)/\w+$`)
 )
 
-type httpHandler struct{}
+type httpHandler struct {
+	endpointID atomic.Int32
+}
 
 func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimSuffix(r.URL.Path, "/")
@@ -65,13 +71,9 @@ func (h *httpHandler) handleServerRegister(w http.ResponseWriter, r *http.Reques
 }
 
 func (h *httpHandler) handleProviderRegister(w http.ResponseWriter, r *http.Request) {
-	group := &routingpb.Group{}
-	err := json.NewDecoder(r.Body).Decode(group)
-	if err != nil {
-		http.Error(w, wrapHTTPError(err), http.StatusInternalServerError)
-		return
-	}
-
+	eid := h.endpointID.Add(1)
+	r.Header.Add(eidHeader, fmt.Sprintf("%d", eid))
+	h.handleReverseProxy(w, r)
 }
 
 // 反向代理，将sdk的请求转发给server

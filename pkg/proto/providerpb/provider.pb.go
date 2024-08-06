@@ -20,13 +20,115 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type LoadBalancer int32
+
+const (
+	LoadBalancer_random          LoadBalancer = 0 // 随机
+	LoadBalancer_consistent_hash LoadBalancer = 1 // 一致性哈希
+	LoadBalancer_weight          LoadBalancer = 2 // 权重
+	LoadBalancer_destination     LoadBalancer = 3 // 指定目标
+)
+
+// Enum value maps for LoadBalancer.
+var (
+	LoadBalancer_name = map[int32]string{
+		0: "random",
+		1: "consistent_hash",
+		2: "weight",
+		3: "destination",
+	}
+	LoadBalancer_value = map[string]int32{
+		"random":          0,
+		"consistent_hash": 1,
+		"weight":          2,
+		"destination":     3,
+	}
+)
+
+func (x LoadBalancer) Enum() *LoadBalancer {
+	p := new(LoadBalancer)
+	*p = x
+	return p
+}
+
+func (x LoadBalancer) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (LoadBalancer) Descriptor() protoreflect.EnumDescriptor {
+	return file_pkg_proto_providerpb_provider_proto_enumTypes[0].Descriptor()
+}
+
+func (LoadBalancer) Type() protoreflect.EnumType {
+	return &file_pkg_proto_providerpb_provider_proto_enumTypes[0]
+}
+
+func (x LoadBalancer) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use LoadBalancer.Descriptor instead.
+func (LoadBalancer) EnumDescriptor() ([]byte, []int) {
+	return file_pkg_proto_providerpb_provider_proto_rawDescGZIP(), []int{0}
+}
+
+type Match int32
+
+const (
+	Match_prefix Match = 0 // 前缀匹配
+	Match_exact  Match = 1 // 完全匹配
+)
+
+// Enum value maps for Match.
+var (
+	Match_name = map[int32]string{
+		0: "prefix",
+		1: "exact",
+	}
+	Match_value = map[string]int32{
+		"prefix": 0,
+		"exact":  1,
+	}
+)
+
+func (x Match) Enum() *Match {
+	p := new(Match)
+	*p = x
+	return p
+}
+
+func (x Match) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (Match) Descriptor() protoreflect.EnumDescriptor {
+	return file_pkg_proto_providerpb_provider_proto_enumTypes[1].Descriptor()
+}
+
+func (Match) Type() protoreflect.EnumType {
+	return &file_pkg_proto_providerpb_provider_proto_enumTypes[1]
+}
+
+func (x Match) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use Match.Descriptor instead.
+func (Match) EnumDescriptor() ([]byte, []int) {
+	return file_pkg_proto_providerpb_provider_proto_rawDescGZIP(), []int{1}
+}
+
 type RegisterRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	GroupName string    `protobuf:"bytes,1,opt,name=group_name,json=groupName,proto3" json:"group_name,omitempty"` // 所在的组名，或namespace名
-	Endpoint  *Endpoint `protobuf:"bytes,2,opt,name=endpoint,proto3" json:"endpoint,omitempty"`
+	GroupName   string       `protobuf:"bytes,1,opt,name=group_name,json=groupName,proto3" json:"group_name,omitempty"` // 所在的组名，或namespace名
+	HostName    string       `protobuf:"bytes,2,opt,name=host_name,json=hostName,proto3" json:"host_name,omitempty"`
+	Port        string       `protobuf:"bytes,3,opt,name=port,proto3" json:"port,omitempty"`
+	Weight      int64        `protobuf:"varint,4,opt,name=weight,proto3" json:"weight,omitempty"`
+	MatchRule   *MatchRule   `protobuf:"bytes,5,opt,name=match_rule,json=matchRule,proto3" json:"match_rule,omitempty"`                                     // 键值匹配规则
+	RoutingRule LoadBalancer `protobuf:"varint,6,opt,name=routing_rule,json=routingRule,proto3,enum=providerpb.LoadBalancer" json:"routing_rule,omitempty"` // 标准路由规则
 }
 
 func (x *RegisterRequest) Reset() {
@@ -68,74 +170,39 @@ func (x *RegisterRequest) GetGroupName() string {
 	return ""
 }
 
-func (x *RegisterRequest) GetEndpoint() *Endpoint {
-	if x != nil {
-		return x.Endpoint
-	}
-	return nil
-}
-
-type Endpoint struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	HostName string `protobuf:"bytes,1,opt,name=host_name,json=hostName,proto3" json:"host_name,omitempty"`
-	Ip       string `protobuf:"bytes,2,opt,name=ip,proto3" json:"ip,omitempty"`
-	Port     string `protobuf:"bytes,3,opt,name=port,proto3" json:"port,omitempty"`
-}
-
-func (x *Endpoint) Reset() {
-	*x = Endpoint{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_pkg_proto_providerpb_provider_proto_msgTypes[1]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *Endpoint) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*Endpoint) ProtoMessage() {}
-
-func (x *Endpoint) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_providerpb_provider_proto_msgTypes[1]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use Endpoint.ProtoReflect.Descriptor instead.
-func (*Endpoint) Descriptor() ([]byte, []int) {
-	return file_pkg_proto_providerpb_provider_proto_rawDescGZIP(), []int{1}
-}
-
-func (x *Endpoint) GetHostName() string {
+func (x *RegisterRequest) GetHostName() string {
 	if x != nil {
 		return x.HostName
 	}
 	return ""
 }
 
-func (x *Endpoint) GetIp() string {
-	if x != nil {
-		return x.Ip
-	}
-	return ""
-}
-
-func (x *Endpoint) GetPort() string {
+func (x *RegisterRequest) GetPort() string {
 	if x != nil {
 		return x.Port
 	}
 	return ""
+}
+
+func (x *RegisterRequest) GetWeight() int64 {
+	if x != nil {
+		return x.Weight
+	}
+	return 0
+}
+
+func (x *RegisterRequest) GetMatchRule() *MatchRule {
+	if x != nil {
+		return x.MatchRule
+	}
+	return nil
+}
+
+func (x *RegisterRequest) GetRoutingRule() LoadBalancer {
+	if x != nil {
+		return x.RoutingRule
+	}
+	return LoadBalancer_random
 }
 
 type RegisterReply struct {
@@ -149,7 +216,7 @@ type RegisterReply struct {
 func (x *RegisterReply) Reset() {
 	*x = RegisterReply{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_pkg_proto_providerpb_provider_proto_msgTypes[2]
+		mi := &file_pkg_proto_providerpb_provider_proto_msgTypes[1]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -162,7 +229,7 @@ func (x *RegisterReply) String() string {
 func (*RegisterReply) ProtoMessage() {}
 
 func (x *RegisterReply) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_providerpb_provider_proto_msgTypes[2]
+	mi := &file_pkg_proto_providerpb_provider_proto_msgTypes[1]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -175,7 +242,7 @@ func (x *RegisterReply) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterReply.ProtoReflect.Descriptor instead.
 func (*RegisterReply) Descriptor() ([]byte, []int) {
-	return file_pkg_proto_providerpb_provider_proto_rawDescGZIP(), []int{2}
+	return file_pkg_proto_providerpb_provider_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *RegisterReply) GetEid() uint32 {
@@ -198,7 +265,7 @@ type HeartbeatRequest struct {
 func (x *HeartbeatRequest) Reset() {
 	*x = HeartbeatRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_pkg_proto_providerpb_provider_proto_msgTypes[3]
+		mi := &file_pkg_proto_providerpb_provider_proto_msgTypes[2]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -211,7 +278,7 @@ func (x *HeartbeatRequest) String() string {
 func (*HeartbeatRequest) ProtoMessage() {}
 
 func (x *HeartbeatRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_providerpb_provider_proto_msgTypes[3]
+	mi := &file_pkg_proto_providerpb_provider_proto_msgTypes[2]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -224,7 +291,7 @@ func (x *HeartbeatRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HeartbeatRequest.ProtoReflect.Descriptor instead.
 func (*HeartbeatRequest) Descriptor() ([]byte, []int) {
-	return file_pkg_proto_providerpb_provider_proto_rawDescGZIP(), []int{3}
+	return file_pkg_proto_providerpb_provider_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *HeartbeatRequest) GetGroupName() string {
@@ -257,7 +324,7 @@ type HeartbeatReply struct {
 func (x *HeartbeatReply) Reset() {
 	*x = HeartbeatReply{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_pkg_proto_providerpb_provider_proto_msgTypes[4]
+		mi := &file_pkg_proto_providerpb_provider_proto_msgTypes[3]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -270,7 +337,7 @@ func (x *HeartbeatReply) String() string {
 func (*HeartbeatReply) ProtoMessage() {}
 
 func (x *HeartbeatReply) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_providerpb_provider_proto_msgTypes[4]
+	mi := &file_pkg_proto_providerpb_provider_proto_msgTypes[3]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -283,7 +350,62 @@ func (x *HeartbeatReply) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HeartbeatReply.ProtoReflect.Descriptor instead.
 func (*HeartbeatReply) Descriptor() ([]byte, []int) {
+	return file_pkg_proto_providerpb_provider_proto_rawDescGZIP(), []int{3}
+}
+
+type MatchRule struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Match   Match  `protobuf:"varint,1,opt,name=match,proto3,enum=providerpb.Match" json:"match,omitempty"` // 匹配方式
+	Content string `protobuf:"bytes,2,opt,name=content,proto3" json:"content,omitempty"`                    // 匹配内容
+}
+
+func (x *MatchRule) Reset() {
+	*x = MatchRule{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_pkg_proto_providerpb_provider_proto_msgTypes[4]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *MatchRule) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MatchRule) ProtoMessage() {}
+
+func (x *MatchRule) ProtoReflect() protoreflect.Message {
+	mi := &file_pkg_proto_providerpb_provider_proto_msgTypes[4]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MatchRule.ProtoReflect.Descriptor instead.
+func (*MatchRule) Descriptor() ([]byte, []int) {
 	return file_pkg_proto_providerpb_provider_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *MatchRule) GetMatch() Match {
+	if x != nil {
+		return x.Match
+	}
+	return Match_prefix
+}
+
+func (x *MatchRule) GetContent() string {
+	if x != nil {
+		return x.Content
+	}
+	return ""
 }
 
 var File_pkg_proto_providerpb_provider_proto protoreflect.FileDescriptor
@@ -292,31 +414,47 @@ var file_pkg_proto_providerpb_provider_proto_rawDesc = []byte{
 	0x0a, 0x23, 0x70, 0x6b, 0x67, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2f, 0x70, 0x72, 0x6f, 0x76,
 	0x69, 0x64, 0x65, 0x72, 0x70, 0x62, 0x2f, 0x70, 0x72, 0x6f, 0x76, 0x69, 0x64, 0x65, 0x72, 0x2e,
 	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x12, 0x0a, 0x70, 0x72, 0x6f, 0x76, 0x69, 0x64, 0x65, 0x72, 0x70,
-	0x62, 0x22, 0x62, 0x0a, 0x0f, 0x52, 0x65, 0x67, 0x69, 0x73, 0x74, 0x65, 0x72, 0x52, 0x65, 0x71,
-	0x75, 0x65, 0x73, 0x74, 0x12, 0x1d, 0x0a, 0x0a, 0x67, 0x72, 0x6f, 0x75, 0x70, 0x5f, 0x6e, 0x61,
-	0x6d, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x09, 0x67, 0x72, 0x6f, 0x75, 0x70, 0x4e,
-	0x61, 0x6d, 0x65, 0x12, 0x30, 0x0a, 0x08, 0x65, 0x6e, 0x64, 0x70, 0x6f, 0x69, 0x6e, 0x74, 0x18,
-	0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x14, 0x2e, 0x70, 0x72, 0x6f, 0x76, 0x69, 0x64, 0x65, 0x72,
-	0x70, 0x62, 0x2e, 0x45, 0x6e, 0x64, 0x70, 0x6f, 0x69, 0x6e, 0x74, 0x52, 0x08, 0x65, 0x6e, 0x64,
-	0x70, 0x6f, 0x69, 0x6e, 0x74, 0x22, 0x4b, 0x0a, 0x08, 0x45, 0x6e, 0x64, 0x70, 0x6f, 0x69, 0x6e,
-	0x74, 0x12, 0x1b, 0x0a, 0x09, 0x68, 0x6f, 0x73, 0x74, 0x5f, 0x6e, 0x61, 0x6d, 0x65, 0x18, 0x01,
-	0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x68, 0x6f, 0x73, 0x74, 0x4e, 0x61, 0x6d, 0x65, 0x12, 0x0e,
-	0x0a, 0x02, 0x69, 0x70, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x02, 0x69, 0x70, 0x12, 0x12,
-	0x0a, 0x04, 0x70, 0x6f, 0x72, 0x74, 0x18, 0x03, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x70, 0x6f,
-	0x72, 0x74, 0x22, 0x21, 0x0a, 0x0d, 0x52, 0x65, 0x67, 0x69, 0x73, 0x74, 0x65, 0x72, 0x52, 0x65,
-	0x70, 0x6c, 0x79, 0x12, 0x10, 0x0a, 0x03, 0x65, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0d,
-	0x52, 0x03, 0x65, 0x69, 0x64, 0x22, 0x60, 0x0a, 0x10, 0x48, 0x65, 0x61, 0x72, 0x74, 0x62, 0x65,
-	0x61, 0x74, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x1d, 0x0a, 0x0a, 0x67, 0x72, 0x6f,
-	0x75, 0x70, 0x5f, 0x6e, 0x61, 0x6d, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x09, 0x67,
-	0x72, 0x6f, 0x75, 0x70, 0x4e, 0x61, 0x6d, 0x65, 0x12, 0x1b, 0x0a, 0x09, 0x68, 0x6f, 0x73, 0x74,
-	0x5f, 0x6e, 0x61, 0x6d, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x68, 0x6f, 0x73,
-	0x74, 0x4e, 0x61, 0x6d, 0x65, 0x12, 0x10, 0x0a, 0x03, 0x65, 0x69, 0x64, 0x18, 0x03, 0x20, 0x01,
-	0x28, 0x0d, 0x52, 0x03, 0x65, 0x69, 0x64, 0x22, 0x10, 0x0a, 0x0e, 0x48, 0x65, 0x61, 0x72, 0x74,
-	0x62, 0x65, 0x61, 0x74, 0x52, 0x65, 0x70, 0x6c, 0x79, 0x42, 0x35, 0x5a, 0x33, 0x67, 0x69, 0x74,
-	0x2e, 0x77, 0x6f, 0x61, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x6b, 0x65, 0x66, 0x75, 0x61, 0x69, 0x2f,
-	0x6d, 0x69, 0x6e, 0x69, 0x2d, 0x72, 0x6f, 0x75, 0x74, 0x65, 0x72, 0x2f, 0x70, 0x6b, 0x67, 0x2f,
-	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2f, 0x70, 0x72, 0x6f, 0x76, 0x69, 0x64, 0x65, 0x72, 0x70, 0x62,
-	0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x62, 0x22, 0xec, 0x01, 0x0a, 0x0f, 0x52, 0x65, 0x67, 0x69, 0x73, 0x74, 0x65, 0x72, 0x52, 0x65,
+	0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x1d, 0x0a, 0x0a, 0x67, 0x72, 0x6f, 0x75, 0x70, 0x5f, 0x6e,
+	0x61, 0x6d, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x09, 0x67, 0x72, 0x6f, 0x75, 0x70,
+	0x4e, 0x61, 0x6d, 0x65, 0x12, 0x1b, 0x0a, 0x09, 0x68, 0x6f, 0x73, 0x74, 0x5f, 0x6e, 0x61, 0x6d,
+	0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x68, 0x6f, 0x73, 0x74, 0x4e, 0x61, 0x6d,
+	0x65, 0x12, 0x12, 0x0a, 0x04, 0x70, 0x6f, 0x72, 0x74, 0x18, 0x03, 0x20, 0x01, 0x28, 0x09, 0x52,
+	0x04, 0x70, 0x6f, 0x72, 0x74, 0x12, 0x16, 0x0a, 0x06, 0x77, 0x65, 0x69, 0x67, 0x68, 0x74, 0x18,
+	0x04, 0x20, 0x01, 0x28, 0x03, 0x52, 0x06, 0x77, 0x65, 0x69, 0x67, 0x68, 0x74, 0x12, 0x34, 0x0a,
+	0x0a, 0x6d, 0x61, 0x74, 0x63, 0x68, 0x5f, 0x72, 0x75, 0x6c, 0x65, 0x18, 0x05, 0x20, 0x01, 0x28,
+	0x0b, 0x32, 0x15, 0x2e, 0x70, 0x72, 0x6f, 0x76, 0x69, 0x64, 0x65, 0x72, 0x70, 0x62, 0x2e, 0x4d,
+	0x61, 0x74, 0x63, 0x68, 0x52, 0x75, 0x6c, 0x65, 0x52, 0x09, 0x6d, 0x61, 0x74, 0x63, 0x68, 0x52,
+	0x75, 0x6c, 0x65, 0x12, 0x3b, 0x0a, 0x0c, 0x72, 0x6f, 0x75, 0x74, 0x69, 0x6e, 0x67, 0x5f, 0x72,
+	0x75, 0x6c, 0x65, 0x18, 0x06, 0x20, 0x01, 0x28, 0x0e, 0x32, 0x18, 0x2e, 0x70, 0x72, 0x6f, 0x76,
+	0x69, 0x64, 0x65, 0x72, 0x70, 0x62, 0x2e, 0x4c, 0x6f, 0x61, 0x64, 0x42, 0x61, 0x6c, 0x61, 0x6e,
+	0x63, 0x65, 0x72, 0x52, 0x0b, 0x72, 0x6f, 0x75, 0x74, 0x69, 0x6e, 0x67, 0x52, 0x75, 0x6c, 0x65,
+	0x22, 0x21, 0x0a, 0x0d, 0x52, 0x65, 0x67, 0x69, 0x73, 0x74, 0x65, 0x72, 0x52, 0x65, 0x70, 0x6c,
+	0x79, 0x12, 0x10, 0x0a, 0x03, 0x65, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0d, 0x52, 0x03,
+	0x65, 0x69, 0x64, 0x22, 0x60, 0x0a, 0x10, 0x48, 0x65, 0x61, 0x72, 0x74, 0x62, 0x65, 0x61, 0x74,
+	0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x1d, 0x0a, 0x0a, 0x67, 0x72, 0x6f, 0x75, 0x70,
+	0x5f, 0x6e, 0x61, 0x6d, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x09, 0x67, 0x72, 0x6f,
+	0x75, 0x70, 0x4e, 0x61, 0x6d, 0x65, 0x12, 0x1b, 0x0a, 0x09, 0x68, 0x6f, 0x73, 0x74, 0x5f, 0x6e,
+	0x61, 0x6d, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x68, 0x6f, 0x73, 0x74, 0x4e,
+	0x61, 0x6d, 0x65, 0x12, 0x10, 0x0a, 0x03, 0x65, 0x69, 0x64, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0d,
+	0x52, 0x03, 0x65, 0x69, 0x64, 0x22, 0x10, 0x0a, 0x0e, 0x48, 0x65, 0x61, 0x72, 0x74, 0x62, 0x65,
+	0x61, 0x74, 0x52, 0x65, 0x70, 0x6c, 0x79, 0x22, 0x4e, 0x0a, 0x09, 0x4d, 0x61, 0x74, 0x63, 0x68,
+	0x52, 0x75, 0x6c, 0x65, 0x12, 0x27, 0x0a, 0x05, 0x6d, 0x61, 0x74, 0x63, 0x68, 0x18, 0x01, 0x20,
+	0x01, 0x28, 0x0e, 0x32, 0x11, 0x2e, 0x70, 0x72, 0x6f, 0x76, 0x69, 0x64, 0x65, 0x72, 0x70, 0x62,
+	0x2e, 0x4d, 0x61, 0x74, 0x63, 0x68, 0x52, 0x05, 0x6d, 0x61, 0x74, 0x63, 0x68, 0x12, 0x18, 0x0a,
+	0x07, 0x63, 0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x07,
+	0x63, 0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74, 0x2a, 0x4c, 0x0a, 0x0c, 0x4c, 0x6f, 0x61, 0x64, 0x42,
+	0x61, 0x6c, 0x61, 0x6e, 0x63, 0x65, 0x72, 0x12, 0x0a, 0x0a, 0x06, 0x72, 0x61, 0x6e, 0x64, 0x6f,
+	0x6d, 0x10, 0x00, 0x12, 0x13, 0x0a, 0x0f, 0x63, 0x6f, 0x6e, 0x73, 0x69, 0x73, 0x74, 0x65, 0x6e,
+	0x74, 0x5f, 0x68, 0x61, 0x73, 0x68, 0x10, 0x01, 0x12, 0x0a, 0x0a, 0x06, 0x77, 0x65, 0x69, 0x67,
+	0x68, 0x74, 0x10, 0x02, 0x12, 0x0f, 0x0a, 0x0b, 0x64, 0x65, 0x73, 0x74, 0x69, 0x6e, 0x61, 0x74,
+	0x69, 0x6f, 0x6e, 0x10, 0x03, 0x2a, 0x1e, 0x0a, 0x05, 0x4d, 0x61, 0x74, 0x63, 0x68, 0x12, 0x0a,
+	0x0a, 0x06, 0x70, 0x72, 0x65, 0x66, 0x69, 0x78, 0x10, 0x00, 0x12, 0x09, 0x0a, 0x05, 0x65, 0x78,
+	0x61, 0x63, 0x74, 0x10, 0x01, 0x42, 0x35, 0x5a, 0x33, 0x67, 0x69, 0x74, 0x2e, 0x77, 0x6f, 0x61,
+	0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x6b, 0x65, 0x66, 0x75, 0x61, 0x69, 0x2f, 0x6d, 0x69, 0x6e, 0x69,
+	0x2d, 0x72, 0x6f, 0x75, 0x74, 0x65, 0x72, 0x2f, 0x70, 0x6b, 0x67, 0x2f, 0x70, 0x72, 0x6f, 0x74,
+	0x6f, 0x2f, 0x70, 0x72, 0x6f, 0x76, 0x69, 0x64, 0x65, 0x72, 0x70, 0x62, 0x62, 0x06, 0x70, 0x72,
+	0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -331,21 +469,26 @@ func file_pkg_proto_providerpb_provider_proto_rawDescGZIP() []byte {
 	return file_pkg_proto_providerpb_provider_proto_rawDescData
 }
 
+var file_pkg_proto_providerpb_provider_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
 var file_pkg_proto_providerpb_provider_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_pkg_proto_providerpb_provider_proto_goTypes = []interface{}{
-	(*RegisterRequest)(nil),  // 0: providerpb.RegisterRequest
-	(*Endpoint)(nil),         // 1: providerpb.Endpoint
-	(*RegisterReply)(nil),    // 2: providerpb.RegisterReply
-	(*HeartbeatRequest)(nil), // 3: providerpb.HeartbeatRequest
-	(*HeartbeatReply)(nil),   // 4: providerpb.HeartbeatReply
+	(LoadBalancer)(0),        // 0: providerpb.LoadBalancer
+	(Match)(0),               // 1: providerpb.Match
+	(*RegisterRequest)(nil),  // 2: providerpb.RegisterRequest
+	(*RegisterReply)(nil),    // 3: providerpb.RegisterReply
+	(*HeartbeatRequest)(nil), // 4: providerpb.HeartbeatRequest
+	(*HeartbeatReply)(nil),   // 5: providerpb.HeartbeatReply
+	(*MatchRule)(nil),        // 6: providerpb.MatchRule
 }
 var file_pkg_proto_providerpb_provider_proto_depIdxs = []int32{
-	1, // 0: providerpb.RegisterRequest.endpoint:type_name -> providerpb.Endpoint
-	1, // [1:1] is the sub-list for method output_type
-	1, // [1:1] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	6, // 0: providerpb.RegisterRequest.match_rule:type_name -> providerpb.MatchRule
+	0, // 1: providerpb.RegisterRequest.routing_rule:type_name -> providerpb.LoadBalancer
+	1, // 2: providerpb.MatchRule.match:type_name -> providerpb.Match
+	3, // [3:3] is the sub-list for method output_type
+	3, // [3:3] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_pkg_proto_providerpb_provider_proto_init() }
@@ -367,18 +510,6 @@ func file_pkg_proto_providerpb_provider_proto_init() {
 			}
 		}
 		file_pkg_proto_providerpb_provider_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*Endpoint); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_pkg_proto_providerpb_provider_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*RegisterReply); i {
 			case 0:
 				return &v.state
@@ -390,7 +521,7 @@ func file_pkg_proto_providerpb_provider_proto_init() {
 				return nil
 			}
 		}
-		file_pkg_proto_providerpb_provider_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
+		file_pkg_proto_providerpb_provider_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*HeartbeatRequest); i {
 			case 0:
 				return &v.state
@@ -402,8 +533,20 @@ func file_pkg_proto_providerpb_provider_proto_init() {
 				return nil
 			}
 		}
-		file_pkg_proto_providerpb_provider_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
+		file_pkg_proto_providerpb_provider_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*HeartbeatReply); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_pkg_proto_providerpb_provider_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*MatchRule); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -420,13 +563,14 @@ func file_pkg_proto_providerpb_provider_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_pkg_proto_providerpb_provider_proto_rawDesc,
-			NumEnums:      0,
+			NumEnums:      2,
 			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
 		GoTypes:           file_pkg_proto_providerpb_provider_proto_goTypes,
 		DependencyIndexes: file_pkg_proto_providerpb_provider_proto_depIdxs,
+		EnumInfos:         file_pkg_proto_providerpb_provider_proto_enumTypes,
 		MessageInfos:      file_pkg_proto_providerpb_provider_proto_msgTypes,
 	}.Build()
 	File_pkg_proto_providerpb_provider_proto = out.File

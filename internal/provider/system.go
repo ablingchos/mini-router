@@ -84,10 +84,11 @@ func (p *Provider) controlLoop() {
 
 func (p *Provider) heartbeat() error {
 	identity := &providerpb.HeartbeatRequest{
-		Eid: ,
+		GroupName: p.Group,
+		HostName:  p.Host,
+		Eid:       p.eid.Eid,
 	}
-	identity.e
-		reqBody, err := json.Marshal(p.identity)
+	reqBody, err := json.Marshal(identity)
 	if err != nil {
 		return util.ErrorWithPos(err)
 	}
@@ -100,7 +101,12 @@ func (p *Provider) heartbeat() error {
 }
 
 func (p *Provider) unregister() {
-	reqbody, err := yaml.Marshal(p.identity)
+	identity := &providerpb.HeartbeatRequest{
+		GroupName: p.Group,
+		HostName:  p.Host,
+		Eid:       p.eid.Eid,
+	}
+	reqbody, err := json.Marshal(identity)
 	if err != nil {
 		mlog.Warnf("failed to marshal to yaml, err: %v", err)
 		return

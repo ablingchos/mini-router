@@ -18,7 +18,7 @@ type Provider struct {
 }
 
 type Eid struct {
-	eid uint32 `json:"eid"`
+	Eid uint32 `json:"eid"`
 }
 
 var (
@@ -28,16 +28,18 @@ var (
 
 // 获取sdk实例
 func GetProvider(temp *Provider) *Provider {
-	once.Do(func() {
+	if provider == nil {
 		provider = temp
-	})
+	}
 	return provider
 }
 
 // 被调方注册
 func (p *Provider) Register(configPath string) error {
-	p.httpClient = *http.DefaultClient
-	p.stopCh = make(chan struct{})
+	once.Do(func() {
+		p.httpClient = *http.DefaultClient
+		p.stopCh = make(chan struct{})
+	})
 	return p.register(configPath)
 }
 

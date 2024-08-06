@@ -5,10 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"git.woa.com/kefuai/mini-router/pkg/proto/providerpb"
 	"git.woa.com/kefuai/mini-router/pkg/proto/routingpb"
 	"git.woa.com/mfcn/ms-go/pkg/mlog"
 	"git.woa.com/mfcn/ms-go/pkg/util"
@@ -20,15 +22,20 @@ type Server struct {
 	leaseCancelFunc context.CancelFunc
 	stopCh          chan struct{}
 	addr            *IpPort
-	routingTable    map[uint32]*routingpb.Group
+	routingTable    map[string]*routingpb.Group
 	mu              sync.RWMutex
+}
+
+type EndpointInfo struct {
+	eid     uint32
+	healthy bool
 }
 
 func NewServer(port string) (*Server, error) {
 	server := &Server{
 		addr:         &IpPort{},
 		stopCh:       make(chan struct{}),
-		routingTable: make(map[uint32]*routingpb.Group),
+		routingTable: make(map[string]*routingpb.Group),
 	}
 	var err error
 	server.etcdClient, err = clientv3.New(clientv3.Config{
@@ -143,30 +150,49 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleProviderRegister(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	group := &routingpb.Group{}
-	err := json.NewDecoder(r.Body).Decode(&group)
+	endpoint := &routingpb.Endpoint{}
+	err := json.NewDecoder(r.Body).Decode(&endpoint)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	idstr := r.Header.Get(eidHeader)
+	eid, err := strconv.Atoi(idstr)
+	if err != nil {
+		http.Error(w, wrapHTTPError(err), http.StatusInternalServerError)
+		return
+	}
+
+	// 向etcd注册心跳
+
+	// 回复
+	ret := &providerpb.RegisterReply{
+		Eid: uint32(eid),
+	}
+	respBytes, err := json.Marshal(ret)
+	if err != nil {
+		http.Error(w, wrapHTTPError(err), http.StatusInternalServerError)
+		return
+	}
+	w.Write(respBytes)
 }
 
 // provider heartbeat
 func (s *Server) handleProviderHeartbeat(w http.ResponseWriter, r *http.Request) {
-
 }
 
 // provider unregister
 func (s *Server) handleProviderUnregister(w http.ResponseWriter, r *http.Request) {
-
 }
 
 // consumer init
 func (s *Server) handleConsumerInit(w http.ResponseWriter, r *http.Request) {
-
 }
 
 // consumer update
 func (s *Server) handleConsumerUpdate(w http.ResponseWriter, r *http.Request) {
+}
+
+func (s *Server) registerProvider() {
 
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"git.woa.com/mfcn/ms-go/pkg/mlog"
@@ -41,9 +40,6 @@ type HttpGateway struct {
 	serverAddrs []string
 	mu          sync.RWMutex
 	lb          *Balancer
-	groupID     atomic.Int32
-	hostID      atomic.Int32
-	endpointID  atomic.Int32
 }
 
 type IpPort struct {
