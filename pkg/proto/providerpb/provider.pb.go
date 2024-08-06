@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.27.1
 // 	protoc        (unknown)
-// source: pkg/proto/provider.proto
+// source: pkg/proto/providerpb/provider.proto
 
 package providerpb
 
@@ -32,7 +32,7 @@ type RegisterRequest struct {
 func (x *RegisterRequest) Reset() {
 	*x = RegisterRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_pkg_proto_provider_proto_msgTypes[0]
+		mi := &file_pkg_proto_providerpb_provider_proto_msgTypes[0]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -45,7 +45,7 @@ func (x *RegisterRequest) String() string {
 func (*RegisterRequest) ProtoMessage() {}
 
 func (x *RegisterRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_provider_proto_msgTypes[0]
+	mi := &file_pkg_proto_providerpb_provider_proto_msgTypes[0]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -58,7 +58,7 @@ func (x *RegisterRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterRequest.ProtoReflect.Descriptor instead.
 func (*RegisterRequest) Descriptor() ([]byte, []int) {
-	return file_pkg_proto_provider_proto_rawDescGZIP(), []int{0}
+	return file_pkg_proto_providerpb_provider_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *RegisterRequest) GetGroupName() string {
@@ -88,7 +88,7 @@ type Endpoint struct {
 func (x *Endpoint) Reset() {
 	*x = Endpoint{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_pkg_proto_provider_proto_msgTypes[1]
+		mi := &file_pkg_proto_providerpb_provider_proto_msgTypes[1]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -101,7 +101,7 @@ func (x *Endpoint) String() string {
 func (*Endpoint) ProtoMessage() {}
 
 func (x *Endpoint) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_provider_proto_msgTypes[1]
+	mi := &file_pkg_proto_providerpb_provider_proto_msgTypes[1]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -114,7 +114,7 @@ func (x *Endpoint) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Endpoint.ProtoReflect.Descriptor instead.
 func (*Endpoint) Descriptor() ([]byte, []int) {
-	return file_pkg_proto_provider_proto_rawDescGZIP(), []int{1}
+	return file_pkg_proto_providerpb_provider_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *Endpoint) GetHostName() string {
@@ -143,13 +143,13 @@ type RegisterReply struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Identity *Identity `protobuf:"bytes,1,opt,name=identity,proto3" json:"identity,omitempty"`
+	Eid uint32 `protobuf:"varint,1,opt,name=eid,proto3" json:"eid,omitempty"` // endpoint id
 }
 
 func (x *RegisterReply) Reset() {
 	*x = RegisterReply{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_pkg_proto_provider_proto_msgTypes[2]
+		mi := &file_pkg_proto_providerpb_provider_proto_msgTypes[2]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -162,7 +162,7 @@ func (x *RegisterReply) String() string {
 func (*RegisterReply) ProtoMessage() {}
 
 func (x *RegisterReply) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_provider_proto_msgTypes[2]
+	mi := &file_pkg_proto_providerpb_provider_proto_msgTypes[2]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -175,73 +175,10 @@ func (x *RegisterReply) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterReply.ProtoReflect.Descriptor instead.
 func (*RegisterReply) Descriptor() ([]byte, []int) {
-	return file_pkg_proto_provider_proto_rawDescGZIP(), []int{2}
+	return file_pkg_proto_providerpb_provider_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *RegisterReply) GetIdentity() *Identity {
-	if x != nil {
-		return x.Identity
-	}
-	return nil
-}
-
-type Identity struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	Gid uint32 `protobuf:"varint,1,opt,name=gid,proto3" json:"gid,omitempty"` // group id
-	Hid uint32 `protobuf:"varint,2,opt,name=hid,proto3" json:"hid,omitempty"` // host id
-	Eid uint32 `protobuf:"varint,3,opt,name=eid,proto3" json:"eid,omitempty"` // endpoint id
-}
-
-func (x *Identity) Reset() {
-	*x = Identity{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_pkg_proto_provider_proto_msgTypes[3]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *Identity) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*Identity) ProtoMessage() {}
-
-func (x *Identity) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_provider_proto_msgTypes[3]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use Identity.ProtoReflect.Descriptor instead.
-func (*Identity) Descriptor() ([]byte, []int) {
-	return file_pkg_proto_provider_proto_rawDescGZIP(), []int{3}
-}
-
-func (x *Identity) GetGid() uint32 {
-	if x != nil {
-		return x.Gid
-	}
-	return 0
-}
-
-func (x *Identity) GetHid() uint32 {
-	if x != nil {
-		return x.Hid
-	}
-	return 0
-}
-
-func (x *Identity) GetEid() uint32 {
+func (x *RegisterReply) GetEid() uint32 {
 	if x != nil {
 		return x.Eid
 	}
@@ -253,13 +190,15 @@ type HeartbeatRequest struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Identity *Identity `protobuf:"bytes,1,opt,name=identity,proto3" json:"identity,omitempty"`
+	GroupName string `protobuf:"bytes,1,opt,name=group_name,json=groupName,proto3" json:"group_name,omitempty"`
+	HostName  string `protobuf:"bytes,2,opt,name=host_name,json=hostName,proto3" json:"host_name,omitempty"`
+	Eid       uint32 `protobuf:"varint,3,opt,name=eid,proto3" json:"eid,omitempty"`
 }
 
 func (x *HeartbeatRequest) Reset() {
 	*x = HeartbeatRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_pkg_proto_provider_proto_msgTypes[4]
+		mi := &file_pkg_proto_providerpb_provider_proto_msgTypes[3]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -272,7 +211,7 @@ func (x *HeartbeatRequest) String() string {
 func (*HeartbeatRequest) ProtoMessage() {}
 
 func (x *HeartbeatRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_provider_proto_msgTypes[4]
+	mi := &file_pkg_proto_providerpb_provider_proto_msgTypes[3]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -285,14 +224,28 @@ func (x *HeartbeatRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HeartbeatRequest.ProtoReflect.Descriptor instead.
 func (*HeartbeatRequest) Descriptor() ([]byte, []int) {
-	return file_pkg_proto_provider_proto_rawDescGZIP(), []int{4}
+	return file_pkg_proto_providerpb_provider_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *HeartbeatRequest) GetIdentity() *Identity {
+func (x *HeartbeatRequest) GetGroupName() string {
 	if x != nil {
-		return x.Identity
+		return x.GroupName
 	}
-	return nil
+	return ""
+}
+
+func (x *HeartbeatRequest) GetHostName() string {
+	if x != nil {
+		return x.HostName
+	}
+	return ""
+}
+
+func (x *HeartbeatRequest) GetEid() uint32 {
+	if x != nil {
+		return x.Eid
+	}
+	return 0
 }
 
 type HeartbeatReply struct {
@@ -304,7 +257,7 @@ type HeartbeatReply struct {
 func (x *HeartbeatReply) Reset() {
 	*x = HeartbeatReply{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_pkg_proto_provider_proto_msgTypes[5]
+		mi := &file_pkg_proto_providerpb_provider_proto_msgTypes[4]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -317,7 +270,7 @@ func (x *HeartbeatReply) String() string {
 func (*HeartbeatReply) ProtoMessage() {}
 
 func (x *HeartbeatReply) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_proto_provider_proto_msgTypes[5]
+	mi := &file_pkg_proto_providerpb_provider_proto_msgTypes[4]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -330,85 +283,78 @@ func (x *HeartbeatReply) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HeartbeatReply.ProtoReflect.Descriptor instead.
 func (*HeartbeatReply) Descriptor() ([]byte, []int) {
-	return file_pkg_proto_provider_proto_rawDescGZIP(), []int{5}
+	return file_pkg_proto_providerpb_provider_proto_rawDescGZIP(), []int{4}
 }
 
-var File_pkg_proto_provider_proto protoreflect.FileDescriptor
+var File_pkg_proto_providerpb_provider_proto protoreflect.FileDescriptor
 
-var file_pkg_proto_provider_proto_rawDesc = []byte{
-	0x0a, 0x18, 0x70, 0x6b, 0x67, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2f, 0x70, 0x72, 0x6f, 0x76,
-	0x69, 0x64, 0x65, 0x72, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x12, 0x0a, 0x70, 0x72, 0x6f, 0x76,
-	0x69, 0x64, 0x65, 0x72, 0x70, 0x62, 0x22, 0x62, 0x0a, 0x0f, 0x52, 0x65, 0x67, 0x69, 0x73, 0x74,
-	0x65, 0x72, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x1d, 0x0a, 0x0a, 0x67, 0x72, 0x6f,
+var file_pkg_proto_providerpb_provider_proto_rawDesc = []byte{
+	0x0a, 0x23, 0x70, 0x6b, 0x67, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2f, 0x70, 0x72, 0x6f, 0x76,
+	0x69, 0x64, 0x65, 0x72, 0x70, 0x62, 0x2f, 0x70, 0x72, 0x6f, 0x76, 0x69, 0x64, 0x65, 0x72, 0x2e,
+	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x12, 0x0a, 0x70, 0x72, 0x6f, 0x76, 0x69, 0x64, 0x65, 0x72, 0x70,
+	0x62, 0x22, 0x62, 0x0a, 0x0f, 0x52, 0x65, 0x67, 0x69, 0x73, 0x74, 0x65, 0x72, 0x52, 0x65, 0x71,
+	0x75, 0x65, 0x73, 0x74, 0x12, 0x1d, 0x0a, 0x0a, 0x67, 0x72, 0x6f, 0x75, 0x70, 0x5f, 0x6e, 0x61,
+	0x6d, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x09, 0x67, 0x72, 0x6f, 0x75, 0x70, 0x4e,
+	0x61, 0x6d, 0x65, 0x12, 0x30, 0x0a, 0x08, 0x65, 0x6e, 0x64, 0x70, 0x6f, 0x69, 0x6e, 0x74, 0x18,
+	0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x14, 0x2e, 0x70, 0x72, 0x6f, 0x76, 0x69, 0x64, 0x65, 0x72,
+	0x70, 0x62, 0x2e, 0x45, 0x6e, 0x64, 0x70, 0x6f, 0x69, 0x6e, 0x74, 0x52, 0x08, 0x65, 0x6e, 0x64,
+	0x70, 0x6f, 0x69, 0x6e, 0x74, 0x22, 0x4b, 0x0a, 0x08, 0x45, 0x6e, 0x64, 0x70, 0x6f, 0x69, 0x6e,
+	0x74, 0x12, 0x1b, 0x0a, 0x09, 0x68, 0x6f, 0x73, 0x74, 0x5f, 0x6e, 0x61, 0x6d, 0x65, 0x18, 0x01,
+	0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x68, 0x6f, 0x73, 0x74, 0x4e, 0x61, 0x6d, 0x65, 0x12, 0x0e,
+	0x0a, 0x02, 0x69, 0x70, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x02, 0x69, 0x70, 0x12, 0x12,
+	0x0a, 0x04, 0x70, 0x6f, 0x72, 0x74, 0x18, 0x03, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x70, 0x6f,
+	0x72, 0x74, 0x22, 0x21, 0x0a, 0x0d, 0x52, 0x65, 0x67, 0x69, 0x73, 0x74, 0x65, 0x72, 0x52, 0x65,
+	0x70, 0x6c, 0x79, 0x12, 0x10, 0x0a, 0x03, 0x65, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0d,
+	0x52, 0x03, 0x65, 0x69, 0x64, 0x22, 0x60, 0x0a, 0x10, 0x48, 0x65, 0x61, 0x72, 0x74, 0x62, 0x65,
+	0x61, 0x74, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x1d, 0x0a, 0x0a, 0x67, 0x72, 0x6f,
 	0x75, 0x70, 0x5f, 0x6e, 0x61, 0x6d, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x09, 0x67,
-	0x72, 0x6f, 0x75, 0x70, 0x4e, 0x61, 0x6d, 0x65, 0x12, 0x30, 0x0a, 0x08, 0x65, 0x6e, 0x64, 0x70,
-	0x6f, 0x69, 0x6e, 0x74, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x14, 0x2e, 0x70, 0x72, 0x6f,
-	0x76, 0x69, 0x64, 0x65, 0x72, 0x70, 0x62, 0x2e, 0x45, 0x6e, 0x64, 0x70, 0x6f, 0x69, 0x6e, 0x74,
-	0x52, 0x08, 0x65, 0x6e, 0x64, 0x70, 0x6f, 0x69, 0x6e, 0x74, 0x22, 0x4b, 0x0a, 0x08, 0x45, 0x6e,
-	0x64, 0x70, 0x6f, 0x69, 0x6e, 0x74, 0x12, 0x1b, 0x0a, 0x09, 0x68, 0x6f, 0x73, 0x74, 0x5f, 0x6e,
-	0x61, 0x6d, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x68, 0x6f, 0x73, 0x74, 0x4e,
-	0x61, 0x6d, 0x65, 0x12, 0x0e, 0x0a, 0x02, 0x69, 0x70, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52,
-	0x02, 0x69, 0x70, 0x12, 0x12, 0x0a, 0x04, 0x70, 0x6f, 0x72, 0x74, 0x18, 0x03, 0x20, 0x01, 0x28,
-	0x09, 0x52, 0x04, 0x70, 0x6f, 0x72, 0x74, 0x22, 0x41, 0x0a, 0x0d, 0x52, 0x65, 0x67, 0x69, 0x73,
-	0x74, 0x65, 0x72, 0x52, 0x65, 0x70, 0x6c, 0x79, 0x12, 0x30, 0x0a, 0x08, 0x69, 0x64, 0x65, 0x6e,
-	0x74, 0x69, 0x74, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x14, 0x2e, 0x70, 0x72, 0x6f,
-	0x76, 0x69, 0x64, 0x65, 0x72, 0x70, 0x62, 0x2e, 0x49, 0x64, 0x65, 0x6e, 0x74, 0x69, 0x74, 0x79,
-	0x52, 0x08, 0x69, 0x64, 0x65, 0x6e, 0x74, 0x69, 0x74, 0x79, 0x22, 0x40, 0x0a, 0x08, 0x49, 0x64,
-	0x65, 0x6e, 0x74, 0x69, 0x74, 0x79, 0x12, 0x10, 0x0a, 0x03, 0x67, 0x69, 0x64, 0x18, 0x01, 0x20,
-	0x01, 0x28, 0x0d, 0x52, 0x03, 0x67, 0x69, 0x64, 0x12, 0x10, 0x0a, 0x03, 0x68, 0x69, 0x64, 0x18,
-	0x02, 0x20, 0x01, 0x28, 0x0d, 0x52, 0x03, 0x68, 0x69, 0x64, 0x12, 0x10, 0x0a, 0x03, 0x65, 0x69,
-	0x64, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0d, 0x52, 0x03, 0x65, 0x69, 0x64, 0x22, 0x44, 0x0a, 0x10,
-	0x48, 0x65, 0x61, 0x72, 0x74, 0x62, 0x65, 0x61, 0x74, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74,
-	0x12, 0x30, 0x0a, 0x08, 0x69, 0x64, 0x65, 0x6e, 0x74, 0x69, 0x74, 0x79, 0x18, 0x01, 0x20, 0x01,
-	0x28, 0x0b, 0x32, 0x14, 0x2e, 0x70, 0x72, 0x6f, 0x76, 0x69, 0x64, 0x65, 0x72, 0x70, 0x62, 0x2e,
-	0x49, 0x64, 0x65, 0x6e, 0x74, 0x69, 0x74, 0x79, 0x52, 0x08, 0x69, 0x64, 0x65, 0x6e, 0x74, 0x69,
-	0x74, 0x79, 0x22, 0x10, 0x0a, 0x0e, 0x48, 0x65, 0x61, 0x72, 0x74, 0x62, 0x65, 0x61, 0x74, 0x52,
-	0x65, 0x70, 0x6c, 0x79, 0x42, 0x35, 0x5a, 0x33, 0x67, 0x69, 0x74, 0x2e, 0x77, 0x6f, 0x61, 0x2e,
-	0x63, 0x6f, 0x6d, 0x2f, 0x6b, 0x65, 0x66, 0x75, 0x61, 0x69, 0x2f, 0x6d, 0x69, 0x6e, 0x69, 0x2d,
-	0x72, 0x6f, 0x75, 0x74, 0x65, 0x72, 0x2f, 0x70, 0x6b, 0x67, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f,
-	0x2f, 0x70, 0x72, 0x6f, 0x76, 0x69, 0x64, 0x65, 0x72, 0x70, 0x62, 0x62, 0x06, 0x70, 0x72, 0x6f,
-	0x74, 0x6f, 0x33,
+	0x72, 0x6f, 0x75, 0x70, 0x4e, 0x61, 0x6d, 0x65, 0x12, 0x1b, 0x0a, 0x09, 0x68, 0x6f, 0x73, 0x74,
+	0x5f, 0x6e, 0x61, 0x6d, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x68, 0x6f, 0x73,
+	0x74, 0x4e, 0x61, 0x6d, 0x65, 0x12, 0x10, 0x0a, 0x03, 0x65, 0x69, 0x64, 0x18, 0x03, 0x20, 0x01,
+	0x28, 0x0d, 0x52, 0x03, 0x65, 0x69, 0x64, 0x22, 0x10, 0x0a, 0x0e, 0x48, 0x65, 0x61, 0x72, 0x74,
+	0x62, 0x65, 0x61, 0x74, 0x52, 0x65, 0x70, 0x6c, 0x79, 0x42, 0x35, 0x5a, 0x33, 0x67, 0x69, 0x74,
+	0x2e, 0x77, 0x6f, 0x61, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x6b, 0x65, 0x66, 0x75, 0x61, 0x69, 0x2f,
+	0x6d, 0x69, 0x6e, 0x69, 0x2d, 0x72, 0x6f, 0x75, 0x74, 0x65, 0x72, 0x2f, 0x70, 0x6b, 0x67, 0x2f,
+	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2f, 0x70, 0x72, 0x6f, 0x76, 0x69, 0x64, 0x65, 0x72, 0x70, 0x62,
+	0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
-	file_pkg_proto_provider_proto_rawDescOnce sync.Once
-	file_pkg_proto_provider_proto_rawDescData = file_pkg_proto_provider_proto_rawDesc
+	file_pkg_proto_providerpb_provider_proto_rawDescOnce sync.Once
+	file_pkg_proto_providerpb_provider_proto_rawDescData = file_pkg_proto_providerpb_provider_proto_rawDesc
 )
 
-func file_pkg_proto_provider_proto_rawDescGZIP() []byte {
-	file_pkg_proto_provider_proto_rawDescOnce.Do(func() {
-		file_pkg_proto_provider_proto_rawDescData = protoimpl.X.CompressGZIP(file_pkg_proto_provider_proto_rawDescData)
+func file_pkg_proto_providerpb_provider_proto_rawDescGZIP() []byte {
+	file_pkg_proto_providerpb_provider_proto_rawDescOnce.Do(func() {
+		file_pkg_proto_providerpb_provider_proto_rawDescData = protoimpl.X.CompressGZIP(file_pkg_proto_providerpb_provider_proto_rawDescData)
 	})
-	return file_pkg_proto_provider_proto_rawDescData
+	return file_pkg_proto_providerpb_provider_proto_rawDescData
 }
 
-var file_pkg_proto_provider_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
-var file_pkg_proto_provider_proto_goTypes = []interface{}{
+var file_pkg_proto_providerpb_provider_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_pkg_proto_providerpb_provider_proto_goTypes = []interface{}{
 	(*RegisterRequest)(nil),  // 0: providerpb.RegisterRequest
 	(*Endpoint)(nil),         // 1: providerpb.Endpoint
 	(*RegisterReply)(nil),    // 2: providerpb.RegisterReply
-	(*Identity)(nil),         // 3: providerpb.Identity
-	(*HeartbeatRequest)(nil), // 4: providerpb.HeartbeatRequest
-	(*HeartbeatReply)(nil),   // 5: providerpb.HeartbeatReply
+	(*HeartbeatRequest)(nil), // 3: providerpb.HeartbeatRequest
+	(*HeartbeatReply)(nil),   // 4: providerpb.HeartbeatReply
 }
-var file_pkg_proto_provider_proto_depIdxs = []int32{
+var file_pkg_proto_providerpb_provider_proto_depIdxs = []int32{
 	1, // 0: providerpb.RegisterRequest.endpoint:type_name -> providerpb.Endpoint
-	3, // 1: providerpb.RegisterReply.identity:type_name -> providerpb.Identity
-	3, // 2: providerpb.HeartbeatRequest.identity:type_name -> providerpb.Identity
-	3, // [3:3] is the sub-list for method output_type
-	3, // [3:3] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	1, // [1:1] is the sub-list for method output_type
+	1, // [1:1] is the sub-list for method input_type
+	1, // [1:1] is the sub-list for extension type_name
+	1, // [1:1] is the sub-list for extension extendee
+	0, // [0:1] is the sub-list for field type_name
 }
 
-func init() { file_pkg_proto_provider_proto_init() }
-func file_pkg_proto_provider_proto_init() {
-	if File_pkg_proto_provider_proto != nil {
+func init() { file_pkg_proto_providerpb_provider_proto_init() }
+func file_pkg_proto_providerpb_provider_proto_init() {
+	if File_pkg_proto_providerpb_provider_proto != nil {
 		return
 	}
 	if !protoimpl.UnsafeEnabled {
-		file_pkg_proto_provider_proto_msgTypes[0].Exporter = func(v interface{}, i int) interface{} {
+		file_pkg_proto_providerpb_provider_proto_msgTypes[0].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*RegisterRequest); i {
 			case 0:
 				return &v.state
@@ -420,7 +366,7 @@ func file_pkg_proto_provider_proto_init() {
 				return nil
 			}
 		}
-		file_pkg_proto_provider_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
+		file_pkg_proto_providerpb_provider_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*Endpoint); i {
 			case 0:
 				return &v.state
@@ -432,7 +378,7 @@ func file_pkg_proto_provider_proto_init() {
 				return nil
 			}
 		}
-		file_pkg_proto_provider_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
+		file_pkg_proto_providerpb_provider_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*RegisterReply); i {
 			case 0:
 				return &v.state
@@ -444,19 +390,7 @@ func file_pkg_proto_provider_proto_init() {
 				return nil
 			}
 		}
-		file_pkg_proto_provider_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*Identity); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_pkg_proto_provider_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
+		file_pkg_proto_providerpb_provider_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*HeartbeatRequest); i {
 			case 0:
 				return &v.state
@@ -468,7 +402,7 @@ func file_pkg_proto_provider_proto_init() {
 				return nil
 			}
 		}
-		file_pkg_proto_provider_proto_msgTypes[5].Exporter = func(v interface{}, i int) interface{} {
+		file_pkg_proto_providerpb_provider_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*HeartbeatReply); i {
 			case 0:
 				return &v.state
@@ -485,18 +419,18 @@ func file_pkg_proto_provider_proto_init() {
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: file_pkg_proto_provider_proto_rawDesc,
+			RawDescriptor: file_pkg_proto_providerpb_provider_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   6,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
-		GoTypes:           file_pkg_proto_provider_proto_goTypes,
-		DependencyIndexes: file_pkg_proto_provider_proto_depIdxs,
-		MessageInfos:      file_pkg_proto_provider_proto_msgTypes,
+		GoTypes:           file_pkg_proto_providerpb_provider_proto_goTypes,
+		DependencyIndexes: file_pkg_proto_providerpb_provider_proto_depIdxs,
+		MessageInfos:      file_pkg_proto_providerpb_provider_proto_msgTypes,
 	}.Build()
-	File_pkg_proto_provider_proto = out.File
-	file_pkg_proto_provider_proto_rawDesc = nil
-	file_pkg_proto_provider_proto_goTypes = nil
-	file_pkg_proto_provider_proto_depIdxs = nil
+	File_pkg_proto_providerpb_provider_proto = out.File
+	file_pkg_proto_providerpb_provider_proto_rawDesc = nil
+	file_pkg_proto_providerpb_provider_proto_goTypes = nil
+	file_pkg_proto_providerpb_provider_proto_depIdxs = nil
 }

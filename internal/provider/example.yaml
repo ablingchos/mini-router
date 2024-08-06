@@ -1,0 +1,72 @@
+host:
+    - guildsvr-mesh
+http:
+    # 对一些接口使用随机 LB
+    - match:
+        - port: 18080 # gm openapi.json
+          uri:
+            prefix: "/openapi.json"
+        - port: 5000 # 反射信息接口
+          uri:
+            prefix: "/grpc.reflection.v1alpha"
+      route:
+        - destination:
+            host: guildsvr-cip
+    # 无法找到路由
+    - match:
+        - port: 5000
+          headers:
+            x-ss-no-route:
+              exact: "1"
+      route:
+        - destination:
+            port:
+              number: 5000
+            host: api-error-pls.red-system.svc.cluster.local
+          headers:
+            request:
+              set:
+                x-api-error-code: "1020009"
+                x-api-error-message: 无法找到路由（guild）
+    # 正常路由
+    - route:
+        - destination:
+            host: ssproxy
+          weight: ${{ match stateful_route_mode ( "ssproxy" => 100, _ => 0 ) }}
+        - destination:
+            host: guildsvr
+          weight: ${{ match stateful_route_mode ( "ssproxy" => 0, _ => 100 ) }}
+
+---
+host: 
+  provider
+http:
+  - match:
+    - port: 18080
+      uri:
+        prefix: "/echo"
+    - port: 18080
+      uri:
+        prefix: "/hello"
+    - port: 8000
+      header:
+        uid:
+          exact: "1"
+    route:
+      - destination:
+          port: 18080
+          chain-match: true
+          weight: 0
+          host: provider-test
+          header:
+            x-gid: 1
+  # 正常路由
+  - route:
+    - destination:
+
+
+
+
+
+
+
