@@ -14,12 +14,18 @@ import (
 	"git.woa.com/kefuai/mini-router/pkg/proto/routingpb"
 	"git.woa.com/mfcn/ms-go/pkg/mlog"
 	"git.woa.com/mfcn/ms-go/pkg/util"
+	"go.etcd.io/etcd/api/v3/mvccpb"
 	clientv3 "go.etcd.io/etcd/client/v3"
+)
+
+const (
+	heartbeatKey = "heartbeat"
 )
 
 type Server struct {
 	etcdClient      *clientv3.Client
 	leaseCancelFunc context.CancelFunc
+	watchCancelFunc context.CancelFunc
 	stopCh          chan struct{}
 	addr            *IpPort
 	routingTable    map[string]*routingpb.Group
@@ -27,8 +33,11 @@ type Server struct {
 }
 
 type EndpointInfo struct {
-	eid     uint32
-	healthy bool
+	GroupName string `json:"group_name"`
+	HostName  string `json:"host_name"`
+	Eid       uint32 `json:"eid"`
+	LeaseID   int64  `json:"lease_id"`
+	Healthy   bool   `json:"healthy"`
 }
 
 func NewServer(port string) (*Server, error) {
@@ -47,6 +56,7 @@ func NewServer(port string) (*Server, error) {
 	}
 	server.addr.IP, _ = getIpAddr()
 	server.addr.Port = port
+
 	return server, nil
 }
 
@@ -67,6 +77,22 @@ func (s *Server) Start() error {
 
 func (s *Server) Stop() {
 	s.leaseCancelFunc()
+	s.watchCancelFunc()
+}
+
+func (s *Server) watchEtcd() {
+	ctx, cancel := context.WithCancel(context.Background())
+	s.watchCancelFunc = cancel
+	watchChan := s.GetEtcdClient().Watch(ctx, "/", clientv3.WithPrefix())
+	for watchResp := range watchChan {
+		for _, ev := range watchResp.Events {
+			if ev.IsCreate() {
+
+			} else if ev.Type == mvccpb.DELETE {
+
+			}
+		}
+	}
 }
 
 // register server
@@ -150,7 +176,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleProviderRegister(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	endpoint := &routingpb.Endpoint{}
+	endpoint := &providerpb.RegisterRequest{}
 	err := json.NewDecoder(r.Body).Decode(&endpoint)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -164,6 +190,11 @@ func (s *Server) handleProviderRegister(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// 向etcd注册心跳
+	s.registerProviderToEtcd("/"+heartbeatKey+"/"+strconv.Itoa(eid), &EndpointInfo{
+		GroupName: endpoint.GroupName,
+		HostName:  endpoint.HostName,
+		Eid:       uint32(eid),
+	})
 
 	// 回复
 	ret := &providerpb.RegisterReply{
@@ -193,6 +224,28 @@ func (s *Server) handleConsumerInit(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleConsumerUpdate(w http.ResponseWriter, r *http.Request) {
 }
 
-func (s *Server) registerProvider() {
+func (s *Server) registerProviderToEtcd(heartbeatKey string, endpoint *EndpointInfo) error {
+	keys := []string{endpoint.GroupName, endpoint.HostName}
+	endpointKey := "/" + strings.Join(keys, "/")
 
+	leaseResp, err := s.GetEtcdClient().Grant(context.Background(), 5)
+	if err != nil {
+		return util.ErrorWithPos(err)
+	}
+	endpoint.LeaseID = int64(leaseResp.ID)
+
+	bytes, err := json.Marshal(endpoint)
+	if err != nil {
+		return util.ErrorWithPos(err)
+	}
+
+	_, err = s.GetEtcdClient().Put(context.Background(), endpointKey, string(bytes))
+	if err != nil {
+		return util.ErrorWithPos(err)
+	}
+	_, err = s.GetEtcdClient().Put(context.Background(), heartbeatKey, time.Now().Truncate(time.Second).String(), clientv3.WithLease(leaseResp.ID))
+	if err != nil {
+		return util.ErrorWithPos(err)
+	}
+	return nil
 }

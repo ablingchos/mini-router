@@ -5,19 +5,19 @@ option go_package = "git.woa.com/kefuai/mini-router/pkg/proto/routingpb";
 
 // 三级结构：group（组）->host（服务）->endpoint（节点）
 message RoutingTable {
-  repeated Group groups = 1;
+  map<string, Group> groups = 1;
 }
 
 message Group {
-  string name         = 1;  // 路由组名称（类似namespace的概念）
-  repeated Host hosts = 2;  // host表
+  string name             = 1;  // 路由组名称（类似namespace的概念）
+  map<string, Host> hosts = 2;  // host表
 }
 
 message Host {
-  string name                 = 1;  // host名
-  MatchRule match_rule        = 2;  // 键值匹配规则
-  LoadBalancer routing_rule   = 3;  // 标准路由规则
-  repeated Endpoint endpoints = 4;  // 节点表
+  string name                     = 1;  // host名
+  MatchRule match_rule            = 2;  // 键值匹配规则
+  LoadBalancer routing_rule       = 3;  // 标准路由规则
+  map<uint32, Endpoint> endpoints = 4;  // 节点表
 }
 
 message Endpoint {
