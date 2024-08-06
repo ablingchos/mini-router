@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package routingpb;
+option go_package = "git.woa.com/kefuai/mini-router/pkg/proto/routingpb";
+
+// 三级结构：group（组）->host（服务）->endpoint（节点）
+message RoutingTable {
+  repeated Group groups = 1;
+}
+
+message Group {
+  string name         = 1;  // 路由组名称（类似namespace的概念）
+  uint32 gid          = 2;  // 路由组id
+  repeated Host hosts = 3;  // host表
+}
+
+message Host {
+  string name                 = 1;  // host名
+  MatchRule match_rule        = 2;  // 键值匹配规则
+  LoadBalancer routing_rule   = 3;  // 标准路由规则
+  repeated Endpoint endpoints = 5;  // 节点表
+}
+
+message Endpoint {
+  uint3 eid     = 1;  // 节点id
+  string ip      = 2;  // ip
+  string port    = 3;  // port
+  uint32 weight  = 4;  // 权重
+  uint32 timeout = 5;  // 心跳超时时间
+}
+
+enum LoadBalancer {
+  random          = 0;  // 随机
+  consistent_hash = 1;  // 一致性哈希
+  weight          = 2;  // 权重
+  destination     = 3;  // 指定目标
+}
+
+message MatchRule {
+  Match match   = 1;  // 匹配方式
+  string content = 2;  // 匹配内容
+}
+
+enum Match {
+  prefix = 0;  // 前缀匹配
+  exact  = 1;  // 完全匹配
+}
