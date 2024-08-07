@@ -26,6 +26,7 @@ message Endpoint {
   string port    = 3;  // port
   uint32 weight  = 4;  // 权重
   uint32 timeout = 5;  // 心跳超时时间
+  int64 lease_id = 6;  // 租约id
 }
 
 enum LoadBalancer {

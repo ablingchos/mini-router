@@ -5,12 +5,13 @@ option go_package = "git.woa.com/kefuai/mini-router/pkg/proto/providerpb";
 
 message RegisterRequest {
   string group_name         = 1;  // 所在的组名，或namespace名
-  string host_name          = 2;
-  string port               = 3;
-  int64 weight              = 4;
-  MatchRule match_rule      = 5;  // 键值匹配规则
-  LoadBalancer routing_rule = 6;  // 标准路由规则
-  int64 lease_id            = 7;  // 租约id
+  string host_name          = 2;  // 提供的服务名
+  string ip                 = 3;
+  string port               = 4;
+  int64 weight              = 5;
+  uint32 timeout            = 6;  // 心跳超时时间
+  MatchRule match_rule      = 7;  // 键值匹配规则
+  LoadBalancer routing_rule = 8;  // 标准路由规则
 }
 
 message RegisterReply {
