@@ -32,14 +32,6 @@ type Server struct {
 	mu              sync.RWMutex
 }
 
-type EndpointInfo struct {
-	GroupName string `json:"group_name"`
-	HostName  string `json:"host_name"`
-	Eid       uint32 `json:"eid"`
-	LeaseID   int64  `json:"lease_id"`
-	Healthy   bool   `json:"healthy"`
-}
-
 func NewServer(port string) (*Server, error) {
 	server := &Server{
 		addr:   &IpPort{},
@@ -70,7 +62,7 @@ func (s *Server) GetEtcdClient() *clientv3.Client {
 }
 
 func (s *Server) Start() error {
-	err := s.register()
+	err := s.registerServer()
 	if err != nil {
 		return util.ErrorWithPos(err)
 	}
@@ -90,16 +82,21 @@ func (s *Server) watchLoop() {
 	for watchResp := range watchChan {
 		for _, ev := range watchResp.Events {
 			if ev.IsCreate() {
-				s.insert(string(ev.Kv.Key), string(ev.Kv.Value))
+				// trim prefix: "/"
+				s.addEndpoint(strings.TrimPrefix(string(ev.Kv.Key), "/"), string(ev.Kv.Value))
+			} else if ev.IsModify() {
+				s.updateEndpoint(strings.TrimPrefix(string(ev.Kv.Key), "/"), string(ev.Kv.Value))
 			} else if ev.Type == mvccpb.DELETE {
-
+				s.deleteEndpoint(strings.TrimPrefix(string(ev.Kv.Key), "/"))
+			} else {
+				mlog.Errorf("invalid type of etcd event: %v", ev)
 			}
 		}
 	}
 }
 
 // register server
-func (s *Server) register() error {
+func (s *Server) registerServer() error {
 	// register to http-gateway
 	getResp, err := s.GetEtcdClient().Get(context.Background(), httpGatewayKey)
 	if err != nil {
@@ -180,21 +177,30 @@ func (s *Server) handleProviderRegister(w http.ResponseWriter, r *http.Request) 
 	w.Header().Set("Content-Type", "application/json")
 
 	endpoint := &providerpb.RegisterRequest{}
-	err := json.NewDecoder(r.Body).Decode(&endpoint)
+	err := json.NewDecoder(r.Body).Decode(endpoint)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		mlog.Errorf("failed to decode request: %v", err)
+		http.Error(w, wrapHTTPError(err), http.StatusBadRequest)
 		return
 	}
 	idstr := r.Header.Get(eidHeader)
 	eid, err := strconv.Atoi(idstr)
 	if err != nil {
+		mlog.Errorf("failed to convert str to int: %v", err)
 		http.Error(w, wrapHTTPError(err), http.StatusInternalServerError)
 		return
 	}
 
 	// 向etcd注册路由表
-	err = s.registerProviderToEtcd(endpoint)
+	err = s.registerProviderToEtcd(endpoint.GroupName, endpoint.HostName, &routingpb.Endpoint{
+		Eid:     uint32(eid),
+		Ip:      endpoint.Ip,
+		Port:    endpoint.Port,
+		Weight:  uint32(endpoint.Weight),
+		Timeout: endpoint.Timeout,
+	})
 	if err != nil {
+		mlog.Errorf("failed to register provider to etcd: %v", err)
 		http.Error(w, wrapHTTPError(err), http.StatusInternalServerError)
 		return
 	}
@@ -205,6 +211,7 @@ func (s *Server) handleProviderRegister(w http.ResponseWriter, r *http.Request) 
 	}
 	respBytes, err := json.Marshal(ret)
 	if err != nil {
+		mlog.Errorf("failed to marshal response: %v", err)
 		http.Error(w, wrapHTTPError(err), http.StatusInternalServerError)
 		return
 	}
@@ -213,6 +220,19 @@ func (s *Server) handleProviderRegister(w http.ResponseWriter, r *http.Request) 
 
 // provider heartbeat
 func (s *Server) handleProviderHeartbeat(w http.ResponseWriter, r *http.Request) {
+	endpoint := &providerpb.HeartbeatRequest{}
+	err := json.NewDecoder(r.Body).Decode(endpoint)
+	if err != nil {
+		mlog.Errorf("failed to decode request: %v", err)
+		http.Error(w, wrapHTTPError(err), http.StatusBadRequest)
+		return
+	}
+	err = s.keepAlive(endpoint.GroupName, endpoint.HostName, endpoint.Eid)
+	if err != nil {
+		mlog.Errorf("failed to keep alive endpoint: [%v/%v/%v]", endpoint.GroupName, endpoint.HostName, endpoint.Eid)
+		http.Error(w, wrapHTTPError(err), http.StatusInternalServerError)
+		return
+	}
 }
 
 // provider unregister
@@ -227,8 +247,9 @@ func (s *Server) handleConsumerInit(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleConsumerUpdate(w http.ResponseWriter, r *http.Request) {
 }
 
-func (s *Server) registerProviderToEtcd(endpoint *providerpb.RegisterRequest) error {
-	keys := []string{routingTablePrefix, endpoint.GroupName, endpoint.HostName}
+func (s *Server) registerProviderToEtcd(groupName string, hostName string, endpoint *routingpb.Endpoint) error {
+	// 在etcd中注册的key，四段式: "/routing/group1/host1/eid"
+	keys := []string{routingTablePrefix, groupName, hostName, strconv.Itoa(int(endpoint.Eid))}
 	endpointKey := "/" + strings.Join(keys, "/")
 
 	leaseResp, err := s.GetEtcdClient().Grant(context.Background(), 5)
@@ -242,9 +263,14 @@ func (s *Server) registerProviderToEtcd(endpoint *providerpb.RegisterRequest) er
 		return util.ErrorWithPos(err)
 	}
 
-	_, err = s.GetEtcdClient().Put(context.Background(), endpointKey, string(bytes))
+	_, err = s.GetEtcdClient().Put(context.Background(), endpointKey, string(bytes), clientv3.WithLease(leaseResp.ID))
 	if err != nil {
 		return util.ErrorWithPos(err)
 	}
+	return nil
+}
+
+func (s *Server) cancelLease(groupName string, hostName string, eid uint32) error {
+
 	return nil
 }

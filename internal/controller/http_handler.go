@@ -81,10 +81,7 @@ func (h *httpHandler) handleReverseProxy(w http.ResponseWriter, r *http.Request)
 	target := httpGateway.lb.GetNextServer()
 	reverseTarget, err := url.Parse(target)
 	if err != nil {
-		b, _ := json.Marshal(map[string]interface{}{
-			"error": err.Error(),
-		})
-		http.Error(w, string(b), http.StatusInternalServerError)
+		http.Error(w, wrapHTTPError(err), http.StatusInternalServerError)
 		return
 	}
 	reverseProxy(reverseTarget).ServeHTTP(w, r)
