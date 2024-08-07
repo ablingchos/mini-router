@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"git.woa.com/kefuai/mini-router/pkg/proto/providerpb"
-	"git.woa.com/kefuai/mini-router/pkg/proto/routingpb"
 	"git.woa.com/mfcn/ms-go/pkg/mlog"
 	"git.woa.com/mfcn/ms-go/pkg/util"
 	"go.etcd.io/etcd/api/v3/mvccpb"
@@ -19,7 +18,7 @@ import (
 )
 
 const (
-	heartbeatKey = "heartbeat"
+	routingTablePrefix = "routing"
 )
 
 type Server struct {
@@ -28,7 +27,7 @@ type Server struct {
 	watchCancelFunc context.CancelFunc
 	stopCh          chan struct{}
 	addr            *IpPort
-	routingTable    map[string]*routingpb.Group
+	routingTable    *RoutingTable
 	mu              sync.RWMutex
 }
 
@@ -44,7 +43,7 @@ func NewServer(port string) (*Server, error) {
 	server := &Server{
 		addr:         &IpPort{},
 		stopCh:       make(chan struct{}),
-		routingTable: make(map[string]*routingpb.Group),
+		routingTable: &RoutingTable{},
 	}
 	var err error
 	server.etcdClient, err = clientv3.New(clientv3.Config{
@@ -72,6 +71,7 @@ func (s *Server) Start() error {
 	if err != nil {
 		return util.ErrorWithPos(err)
 	}
+	go s.watchLoop()
 	return err
 }
 
@@ -80,14 +80,14 @@ func (s *Server) Stop() {
 	s.watchCancelFunc()
 }
 
-func (s *Server) watchEtcd() {
+func (s *Server) watchLoop() {
 	ctx, cancel := context.WithCancel(context.Background())
 	s.watchCancelFunc = cancel
-	watchChan := s.GetEtcdClient().Watch(ctx, "/", clientv3.WithPrefix())
+	watchChan := s.GetEtcdClient().Watch(ctx, "/"+routingTablePrefix, clientv3.WithPrefix())
 	for watchResp := range watchChan {
 		for _, ev := range watchResp.Events {
 			if ev.IsCreate() {
-
+				s.Insert(string(ev.Kv.Key), string(ev.Kv.Value))
 			} else if ev.Type == mvccpb.DELETE {
 
 			}
@@ -189,8 +189,8 @@ func (s *Server) handleProviderRegister(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// 向etcd注册心跳
-	s.registerProviderToEtcd("/"+heartbeatKey+"/"+strconv.Itoa(eid), &EndpointInfo{
+	// 向etcd注册路由表
+	s.registerProviderToEtcd("/"+routingTablePrefix+"/"+strconv.Itoa(eid), &EndpointInfo{
 		GroupName: endpoint.GroupName,
 		HostName:  endpoint.HostName,
 		Eid:       uint32(eid),
@@ -224,7 +224,7 @@ func (s *Server) handleConsumerInit(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleConsumerUpdate(w http.ResponseWriter, r *http.Request) {
 }
 
-func (s *Server) registerProviderToEtcd(heartbeatKey string, endpoint *EndpointInfo) error {
+func (s *Server) registerProviderToEtcd(heartbeatKey string, endpoint *providerpb.RegisterRequest) error {
 	keys := []string{endpoint.GroupName, endpoint.HostName}
 	endpointKey := "/" + strings.Join(keys, "/")
 

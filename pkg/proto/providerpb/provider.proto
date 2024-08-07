@@ -10,6 +10,7 @@ message RegisterRequest {
   int64 weight              = 4;
   MatchRule match_rule      = 5;  // 键值匹配规则
   LoadBalancer routing_rule = 6;  // 标准路由规则
+  int64 lease_id            = 7;  // 租约id
 }
 
 message RegisterReply {
