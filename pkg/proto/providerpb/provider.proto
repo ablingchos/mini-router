@@ -14,21 +14,21 @@ message RegisterRequest {
   string host_name          = 2;  // 提供的服务名
   string ip                 = 3;
   string port               = 4;
-  uint32 weight             = 5;
+  int64 weight              = 5;
   int64 timeout             = 6;  // 心跳超时时间
   MatchRule match_rule      = 7;  // 键值匹配规则
   LoadBalancer routing_rule = 8;  // 标准路由规则
 }
 
 message RegisterReply {
-  uint32 eid     = 1;  // endpoint id
+  int64 eid      = 1;  // endpoint id
   int64 lease_id = 2;  // keep alive lease id
 }
 
 message HeartbeatRequest {
   string group_name = 1;
   string host_name  = 2;
-  uint32 eid        = 3;
+  int64 eid         = 3;
   int64 lease_id    = 4;  // keep alive lease id
 }
 
@@ -54,7 +54,7 @@ enum Match {
 message UnregisterRequest {
   string group_name = 1;
   string host_name  = 2;
-  uint32 eid        = 3;
+  int64 eid         = 3;
   int64 lease_id    = 4;
 }
 

@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package controllerpb;
+option go_package = "git.woa.com/kefuai/mini-router/pkg/proto/controllerpb";
+
+service IdService {
+  rpc GenerateId(GenerateIdRequest) returns (GenerateIdReply);
+}
+
+message GenerateIdRequest {}
+
+message GenerateIdReply {
+  int64 eid = 1;
+}

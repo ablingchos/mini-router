@@ -260,11 +260,10 @@ func (s *Server) handleProviderRegister(w http.ResponseWriter, r *http.Request) 
 
 	// 向etcd注册路由表
 	err = s.registerProviderToEtcd(endpoint.GroupName, endpoint.HostName, &routingpb.Endpoint{
-		Eid:     uint32(eid),
-		Ip:      endpoint.Ip,
-		Port:    endpoint.Port,
-		Weight:  uint32(endpoint.Weight),
-		Timeout: endpoint.Timeout,
+		Eid:    uint32(eid),
+		Ip:     endpoint.Ip,
+		Port:   endpoint.Port,
+		Weight: uint32(endpoint.Weight),
 	})
 	if err != nil {
 		mlog.Errorf("failed to register provider to etcd: %v", err)

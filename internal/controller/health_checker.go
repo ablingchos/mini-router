@@ -62,6 +62,7 @@ func (r *RegisterServer) Register(ctx context.Context, req *providerpb.RegisterR
 		return nil, util.ErrorWithPos(err)
 	}
 
+	mlog.Infof("[%v/%v/%v] register finished", req.GetGroupName(), req.GetHostName(), eid)
 	return &providerpb.RegisterReply{
 		Eid:     eid,
 		LeaseId: int64(leaseResp.ID),
@@ -75,5 +76,15 @@ func (r *RegisterServer) Heartbeat(ctx context.Context, req *providerpb.Heartbea
 		mlog.Errorf("failed to keep alive endpoint: [%v/%v/%v]", req.GetGroupName(), req.GetHostName(), req.GetEid())
 		return nil, util.ErrorWithPos(err)
 	}
+	mlog.Infof("[%v/%v/%v] heartbeat finished", req.GetGroupName(), req.GetHostName(), req.GetEid())
 	return &providerpb.HeartbeatReply{}, nil
+}
+
+func (r *RegisterServer) Unregister(ctx context.Context, req *providerpb.UnregisterRequest) (*providerpb.UnregisterReply, error) {
+	_, err := r.etcdClient.Revoke(context.Background(), clientv3.LeaseID(req.GetLeaseId()))
+	if err != nil {
+		return nil, util.ErrorWithPos(err)
+	}
+	mlog.Infof("[%v/%v/%v] unregister finished", req.GetGroupName(), req.GetHostName(), req.GetEid())
+	return &providerpb.UnregisterReply{}, nil
 }
