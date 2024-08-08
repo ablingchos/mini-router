@@ -1,16 +1,11 @@
 package controller
 
 import (
-	"context"
-	"encoding/json"
 	"strconv"
-	"strings"
 
 	"git.woa.com/kefuai/mini-router/pkg/proto/routingpb"
 	"git.woa.com/mfcn/ms-go/pkg/mlog"
 	"git.woa.com/mfcn/ms-go/pkg/util"
-	clientv3 "go.etcd.io/etcd/client/v3"
-	"go.uber.org/zap"
 )
 
 type RoutingTable routingpb.RoutingTable
@@ -117,81 +112,4 @@ func (r *RoutingTable) getLeaseID(groupName string, hostName string, eid uint32)
 
 	leaseID := host.Endpoints[eid].LeaseId
 	return leaseID, nil
-}
-
-func (s *Server) addEndpoint(key string, value string) {
-	// split key
-	words := strings.Split(key, "/")
-	if len(words) != 4 || words[0] != routingTablePrefix {
-		mlog.Warn("wrong format to add an endpoint", zap.Any("key", key), zap.Any("value", value))
-		return
-	}
-
-	endpointInfo := &routingpb.Endpoint{}
-	err := json.Unmarshal([]byte(value), endpointInfo)
-	if err != nil {
-		mlog.Warn("failed to unmarshal", zap.Any("key", key), zap.Any("value", value))
-		return
-	}
-	// add endpoint
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	err = s.routingTable.insert(words[1], words[2], endpointInfo)
-	if err != nil {
-		mlog.Errorf("failed to add endpoint, err: %v", err)
-	}
-}
-
-func (s *Server) updateEndpoint(key string, value string) {
-	// split key
-	words := strings.Split(key, "/")
-	if len(words) != 4 || words[0] != routingTablePrefix {
-		mlog.Warn("wrong format to add an endpoint", zap.Any("key", key), zap.Any("value", value))
-		return
-	}
-
-	endpointInfo := &routingpb.Endpoint{}
-	err := json.Unmarshal([]byte(value), endpointInfo)
-	if err != nil {
-		mlog.Warn("failed to unmarshal", zap.Any("key", key), zap.Any("value", value))
-		return
-	}
-	// // update endpoint
-	// s.mu.Lock()
-	// defer s.mu.Unlock()
-	// err = s.routingTable.update(words[1], words[2], endpointInfo)
-	// if err != nil {
-	// 	mlog.Errorf("failed to update endpoint, err: %v", err)
-	// }
-	mlog.Debugf("update endpoint [%v/%v/%v]", words[1], words[2], words[3])
-}
-
-func (s *Server) deleteEndpoint(key string) {
-	// split key
-	words := strings.Split(key, "/")
-	if len(words) != 4 || words[0] != routingTablePrefix {
-		mlog.Warn("wrong format to delete an endpoint", zap.Any("key", key))
-		return
-	}
-	// delete key
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	err := s.routingTable.delete(words[1], words[2], words[3])
-	if err != nil {
-		mlog.Errorf("failed to delete endpoint, err: %v", err)
-	}
-}
-
-func (s *Server) keepAlive(groupName string, hostName string, eid uint32) error {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	leaseID, err := s.routingTable.getLeaseID(groupName, hostName, eid)
-	if err != nil {
-		return util.ErrorWithPos(err)
-	}
-	_, err = s.etcdClient.KeepAliveOnce(context.Background(), clientv3.LeaseID(leaseID))
-	if err != nil {
-		return util.ErrorWithPos(err)
-	}
-	return nil
 }

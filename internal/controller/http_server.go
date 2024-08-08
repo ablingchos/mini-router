@@ -35,11 +35,12 @@ var (
 )
 
 type HttpGateway struct {
-	etcdClient  *clientv3.Client
-	addr        *IpPort
-	serverAddrs []string
-	mu          sync.RWMutex
-	lb          *Balancer
+	etcdClient      *clientv3.Client
+	addr            *IpPort
+	serverAddrs     []string
+	mu              sync.RWMutex
+	lb              *Balancer
+	watchCancelFunc context.CancelFunc
 }
 
 type IpPort struct {
@@ -80,6 +81,10 @@ func (h *HttpGateway) Run() {
 	go h.serveHttp()
 }
 
+func (h *HttpGateway) Stop() {
+	h.watchCancelFunc()
+}
+
 func (h *HttpGateway) watchServer(key string) {
 	// 校验key是否在etcd中已经注册
 	time.Sleep(3 * time.Second)
@@ -94,7 +99,7 @@ func (h *HttpGateway) watchServer(key string) {
 	}
 	// 开始watch租约
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	h.watchCancelFunc = cancel
 	watchCh := h.etcdClient.Watch(ctx, key)
 	for watchResp := range watchCh {
 		for _, event := range watchResp.Events {
@@ -109,6 +114,8 @@ func (h *HttpGateway) watchServer(key string) {
 				return
 			case mvccpb.PUT:
 				mlog.Infof("key heartbeat: %v", key)
+			default:
+				mlog.Errorf("invalid type of etcd event: %v", event)
 			}
 		}
 	}

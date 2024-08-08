@@ -48,3 +48,5 @@ message UnregistRequest {
   string host_name  = 2;
   uint32 eid        = 3;
 }
+
+message UnregistResponse {}

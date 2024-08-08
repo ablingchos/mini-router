@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"git.woa.com/kefuai/mini-router/pkg/proto/providerpb"
@@ -18,8 +19,14 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
+var (
+	Location *time.Location
+)
+
 const (
 	routingTablePrefix = "routing"
+	timeZone           = "Asia/Shanghai"
+	snapshotInterval   = 2
 )
 
 type Server struct {
@@ -30,17 +37,24 @@ type Server struct {
 	addr            *IpPort
 	routingTable    *RoutingTable
 	mu              sync.RWMutex
+	snapshot        atomic.Pointer[*routingpb.RoutingTable]
+	lastUpdateTime  time.Time
 }
 
 func NewServer(port string) (*Server, error) {
+	loc, err := time.LoadLocation(timeZone)
+	if err != nil {
+		return nil, util.ErrorWithPos(err)
+	}
+	Location = loc
 	server := &Server{
 		addr:   &IpPort{},
 		stopCh: make(chan struct{}),
 		routingTable: &RoutingTable{
 			Groups: make(map[string]*routingpb.Group),
 		},
+		snapshot: atomic.Pointer[*routingpb.RoutingTable]{},
 	}
-	var err error
 	server.etcdClient, err = clientv3.New(clientv3.Config{
 		Endpoints:   []string{etcdUri},
 		DialTimeout: 5 * time.Second,
@@ -62,7 +76,12 @@ func (s *Server) GetEtcdClient() *clientv3.Client {
 }
 
 func (s *Server) Start() error {
-	err := s.registerServer()
+	err := s.initRoutingTable()
+	if err != nil {
+		return util.ErrorWithPos(err)
+	}
+
+	err = s.registerServer()
 	if err != nil {
 		return util.ErrorWithPos(err)
 	}
@@ -75,24 +94,72 @@ func (s *Server) Stop() {
 	s.watchCancelFunc()
 }
 
+// 初始化server， 拉取全量路由表
+func (s *Server) initRoutingTable() error {
+	resp, err := s.etcdClient.Get(context.Background(), "/"+routingTablePrefix, clientv3.WithPrefix())
+	if err != nil {
+		return util.ErrorWithPos(err)
+	}
+	for _, kv := range resp.Kvs {
+		key := strings.TrimPrefix(string(kv.Key), "/")
+		value := &routingpb.Endpoint{}
+		err := json.Unmarshal(kv.Value, value)
+		if err != nil {
+			mlog.Errorf("failed to unmarshal value: %v", kv.Value)
+			continue
+		}
+		s.addEndpoint(key, value)
+	}
+	go s.snapshotLoop()
+	return nil
+}
+
 func (s *Server) watchLoop() {
 	ctx, cancel := context.WithCancel(context.Background())
 	s.watchCancelFunc = cancel
 	watchChan := s.GetEtcdClient().Watch(ctx, "/"+routingTablePrefix, clientv3.WithPrefix())
 	for watchResp := range watchChan {
-		for _, ev := range watchResp.Events {
-			if ev.IsCreate() {
-				// trim prefix: "/"
-				s.addEndpoint(strings.TrimPrefix(string(ev.Kv.Key), "/"), string(ev.Kv.Value))
-			} else if ev.IsModify() {
-				s.updateEndpoint(strings.TrimPrefix(string(ev.Kv.Key), "/"), string(ev.Kv.Value))
-			} else if ev.Type == mvccpb.DELETE {
-				s.deleteEndpoint(strings.TrimPrefix(string(ev.Kv.Key), "/"))
-			} else {
-				mlog.Errorf("invalid type of etcd event: %v", ev)
+		for _, event := range watchResp.Events {
+			key := strings.TrimPrefix(string(event.Kv.Key), "/")
+			switch event.Type {
+			case mvccpb.PUT:
+				value := &routingpb.Endpoint{}
+				err := json.Unmarshal(event.Kv.Value, value)
+				if err != nil {
+					mlog.Errorf("failed to unmarshal value: %v", event.Kv.Value)
+					break
+				}
+				if event.IsCreate() {
+					s.addEndpoint(key, value)
+				} else {
+					s.updateEndpoint(key, value)
+				}
+			case mvccpb.DELETE:
+				s.deleteEndpoint(key)
+			default:
+				mlog.Errorf("invalid type of etcd event: %v", event)
 			}
 		}
 	}
+}
+
+func (s *Server) snapshotLoop() {
+	ticker := time.NewTicker(snapshotInterval * time.Second)
+	for {
+		select {
+		case <-ticker.C:
+			s.storeSnapshot()
+		case <-s.stopCh:
+			mlog.Info("receive stop signal, build tag has stopped")
+			return
+		}
+	}
+}
+
+func (s *Server) storeSnapshot() {
+	snapshot := s.cloneRoutingTable()
+	s.snapshot.Store(&snapshot)
+	s.lastUpdateTime = time.Now().In(Location)
 }
 
 // register server
@@ -206,16 +273,14 @@ func (s *Server) handleProviderRegister(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// 回复
-	ret := &providerpb.RegisterReply{
+	registerResp := &providerpb.RegisterReply{
 		Eid: uint32(eid),
 	}
-	respBytes, err := json.Marshal(ret)
-	if err != nil {
-		mlog.Errorf("failed to marshal response: %v", err)
+	// 使用 json.NewEncoder 直接写入 http.ResponseWriter
+	if err := json.NewEncoder(w).Encode(registerResp); err != nil {
+		mlog.Errorf("failed to marshal and write response: %v", err)
 		http.Error(w, wrapHTTPError(err), http.StatusInternalServerError)
-		return
 	}
-	w.Write(respBytes)
 }
 
 // provider heartbeat
@@ -227,50 +292,45 @@ func (s *Server) handleProviderHeartbeat(w http.ResponseWriter, r *http.Request)
 		http.Error(w, wrapHTTPError(err), http.StatusBadRequest)
 		return
 	}
+	// keep alive
 	err = s.keepAlive(endpoint.GroupName, endpoint.HostName, endpoint.Eid)
 	if err != nil {
 		mlog.Errorf("failed to keep alive endpoint: [%v/%v/%v]", endpoint.GroupName, endpoint.HostName, endpoint.Eid)
 		http.Error(w, wrapHTTPError(err), http.StatusInternalServerError)
-		return
 	}
 }
 
 // provider unregister
 func (s *Server) handleProviderUnregister(w http.ResponseWriter, r *http.Request) {
+	endpoint := &providerpb.UnregistRequest{}
+	err := json.NewDecoder(r.Body).Decode(endpoint)
+	if err != nil {
+		mlog.Errorf("failed to decode request: %v", err)
+		http.Error(w, wrapHTTPError(err), http.StatusBadRequest)
+		return
+	}
+	// revoke lease
+	err = s.revokeLease(endpoint.GroupName, endpoint.HostName, endpoint.Eid)
+	if err != nil {
+		mlog.Errorf("failed to unregister endpoint: [%v/%v/%v]", endpoint.GroupName, endpoint.HostName, endpoint.Eid)
+		http.Error(w, wrapHTTPError(err), http.StatusInternalServerError)
+	}
 }
 
 // consumer init
 func (s *Server) handleConsumerInit(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	routingTable := s.cloneRoutingTable()
+
+	// 使用 json.NewEncoder 直接写入 http.ResponseWriter
+	if err := json.NewEncoder(w).Encode(routingTable); err != nil {
+		mlog.Errorf("failed to marshal and write response: %v", err)
+		http.Error(w, wrapHTTPError(err), http.StatusInternalServerError)
+	}
 }
 
 // consumer update
 func (s *Server) handleConsumerUpdate(w http.ResponseWriter, r *http.Request) {
-}
+	w.Header().Set("Content-Type", "application/json")
 
-func (s *Server) registerProviderToEtcd(groupName string, hostName string, endpoint *routingpb.Endpoint) error {
-	// 在etcd中注册的key，四段式: "/routing/group1/host1/eid"
-	keys := []string{routingTablePrefix, groupName, hostName, strconv.Itoa(int(endpoint.Eid))}
-	endpointKey := "/" + strings.Join(keys, "/")
-
-	leaseResp, err := s.GetEtcdClient().Grant(context.Background(), 5)
-	if err != nil {
-		return util.ErrorWithPos(err)
-	}
-	endpoint.LeaseId = int64(leaseResp.ID)
-
-	bytes, err := json.Marshal(endpoint)
-	if err != nil {
-		return util.ErrorWithPos(err)
-	}
-
-	_, err = s.GetEtcdClient().Put(context.Background(), endpointKey, string(bytes), clientv3.WithLease(leaseResp.ID))
-	if err != nil {
-		return util.ErrorWithPos(err)
-	}
-	return nil
-}
-
-func (s *Server) cancelLease(groupName string, hostName string, eid uint32) error {
-
-	return nil
 }

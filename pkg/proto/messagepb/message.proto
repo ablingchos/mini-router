@@ -1,4 +1,0 @@
-syntax = "proto3";
-
-package routingpb;
-option go_package = "git.woa.com/kefuai/mini-router/pkg/proto/messagepb";

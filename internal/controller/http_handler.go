@@ -89,7 +89,7 @@ func (h *httpHandler) handleReverseProxy(w http.ResponseWriter, r *http.Request)
 
 func httpMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		start := time.Now()
+		start := time.Now().In(Location)
 		mlog.Info("received new http request",
 			zap.Any("soure addr", r.RemoteAddr), zap.Any("path", r.URL.Path), zap.Any("header", r.Header))
 
