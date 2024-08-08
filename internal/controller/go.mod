@@ -3,7 +3,7 @@ module git.woa.com/kefuai/mini-router/controller
 go 1.21.1
 
 require (
-	git.woa.com/kefuai/mini-router v0.0.0-20240808105110-25572508134c
+	git.woa.com/kefuai/mini-router v0.0.0-20240808111117-1c46c5a53ec1
 	git.woa.com/mfcn/ms-go v0.4.71
 	github.com/samber/lo v1.46.0
 	go.etcd.io/etcd/api/v3 v3.5.15
