@@ -24,6 +24,7 @@ const _ = grpc.SupportPackageIsVersion7
 type ProviderServiceClient interface {
 	Register(ctx context.Context, in *RegisterRequest, opts ...grpc.CallOption) (*RegisterReply, error)
 	Heartbeat(ctx context.Context, in *HeartbeatRequest, opts ...grpc.CallOption) (*HeartbeatReply, error)
+	Unregister(ctx context.Context, in *UnregisterRequest, opts ...grpc.CallOption) (*UnregisterReply, error)
 }
 
 type providerServiceClient struct {
@@ -52,12 +53,22 @@ func (c *providerServiceClient) Heartbeat(ctx context.Context, in *HeartbeatRequ
 	return out, nil
 }
 
+func (c *providerServiceClient) Unregister(ctx context.Context, in *UnregisterRequest, opts ...grpc.CallOption) (*UnregisterReply, error) {
+	out := new(UnregisterReply)
+	err := c.cc.Invoke(ctx, "/providerpb.ProviderService/Unregister", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ProviderServiceServer is the server API for ProviderService service.
 // All implementations must embed UnimplementedProviderServiceServer
 // for forward compatibility
 type ProviderServiceServer interface {
 	Register(context.Context, *RegisterRequest) (*RegisterReply, error)
 	Heartbeat(context.Context, *HeartbeatRequest) (*HeartbeatReply, error)
+	Unregister(context.Context, *UnregisterRequest) (*UnregisterReply, error)
 	mustEmbedUnimplementedProviderServiceServer()
 }
 
@@ -70,6 +81,9 @@ func (UnimplementedProviderServiceServer) Register(context.Context, *RegisterReq
 }
 func (UnimplementedProviderServiceServer) Heartbeat(context.Context, *HeartbeatRequest) (*HeartbeatReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Heartbeat not implemented")
+}
+func (UnimplementedProviderServiceServer) Unregister(context.Context, *UnregisterRequest) (*UnregisterReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Unregister not implemented")
 }
 func (UnimplementedProviderServiceServer) mustEmbedUnimplementedProviderServiceServer() {}
 
@@ -120,6 +134,24 @@ func _ProviderService_Heartbeat_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ProviderService_Unregister_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UnregisterRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProviderServiceServer).Unregister(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/providerpb.ProviderService/Unregister",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProviderServiceServer).Unregister(ctx, req.(*UnregisterRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ProviderService_ServiceDesc is the grpc.ServiceDesc for ProviderService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -134,6 +166,10 @@ var ProviderService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Heartbeat",
 			Handler:    _ProviderService_Heartbeat_Handler,
+		},
+		{
+			MethodName: "Unregister",
+			Handler:    _ProviderService_Unregister_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
