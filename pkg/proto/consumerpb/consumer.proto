@@ -2,5 +2,3 @@ syntax = "proto3";
 
 package consumerpb;
 option go_package = "git.woa.com/kefuai/mini-router/pkg/proto/consumerpb";
-
-
