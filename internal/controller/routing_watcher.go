@@ -140,14 +140,14 @@ func (r *RoutingWatcher) watchLoop() {
 				}
 				if event.IsCreate() {
 					r.addEndpoint(groupName, hostName, endpoint)
-					r.logWriter.insert(groupName, hostName, endpoint)
+					r.logWriter.write(groupName, hostName, endpoint, routingpb.ChangeType_add)
 				} else {
 					r.updateEndpoint(groupName, hostName, endpoint)
-					r.logWriter.update(groupName, hostName, endpoint)
+					r.logWriter.write(groupName, hostName, endpoint, routingpb.ChangeType_update)
 				}
 			case mvccpb.DELETE:
 				r.deleteEndpoint(groupName, hostName, eidStr)
-				r.logWriter.delete(groupName, hostName, nil)
+				r.logWriter.write(groupName, hostName, nil, routingpb.ChangeType_delete)
 			default:
 				mlog.Errorf("invalid type of etcd event: %v", event)
 			}
@@ -208,7 +208,7 @@ func (r *RoutingWatcher) updateRoutingToEtcd() error {
 
 func (r *RoutingWatcher) reportChangeRecordsToEtcd() error {
 	version := r.version.Load()
-	records := r.logWriter.flushRecords(version)
+	records := r.logWriter.flush(version)
 	bytes, err := json.Marshal(records)
 	if err != nil {
 		return util.ErrorWithPos(err)

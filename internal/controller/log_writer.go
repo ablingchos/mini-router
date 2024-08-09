@@ -24,7 +24,7 @@ func (l *LogWriter) newRecords(version int64) {
 	}
 }
 
-func (l *LogWriter) flushRecords(version int64) *routingpb.ChangeRecords {
+func (l *LogWriter) flush(version int64) *routingpb.ChangeRecords {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	cloned, _ := proto.Clone(l.records).(*routingpb.ChangeRecords)
@@ -32,38 +32,12 @@ func (l *LogWriter) flushRecords(version int64) *routingpb.ChangeRecords {
 	return cloned
 }
 
-func (l *LogWriter) insert(groupName string, hostName string, endpoint *routingpb.Endpoint) {
+func (l *LogWriter) write(groupName string, hostName string, endpoint *routingpb.Endpoint, method routingpb.ChangeType) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	now := time.Now().In(Location)
 	l.records.Records = append(l.records.Records, &routingpb.ChangeRecord{
-		Type:      routingpb.ChangeType_add,
-		GroupName: groupName,
-		HostName:  hostName,
-		Endpoint:  endpoint,
-		TimeStamp: now.Unix(),
-	})
-}
-
-func (l *LogWriter) update(groupName string, hostName string, endpoint *routingpb.Endpoint) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	now := time.Now().In(Location)
-	l.records.Records = append(l.records.Records, &routingpb.ChangeRecord{
-		Type:      routingpb.ChangeType_update,
-		GroupName: groupName,
-		HostName:  hostName,
-		Endpoint:  endpoint,
-		TimeStamp: now.Unix(),
-	})
-}
-
-func (l *LogWriter) delete(groupName string, hostName string, endpoint *routingpb.Endpoint) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	now := time.Now().In(Location)
-	l.records.Records = append(l.records.Records, &routingpb.ChangeRecord{
-		Type:      routingpb.ChangeType_delete,
+		Type:      method,
 		GroupName: groupName,
 		HostName:  hostName,
 		Endpoint:  endpoint,
