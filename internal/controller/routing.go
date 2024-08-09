@@ -23,7 +23,7 @@ func (r *RoutingTable) Insert(groupName string, hostName string, endpoint *routi
 	if _, ok := group.Hosts[hostName]; !ok {
 		group.Hosts[hostName] = &routingpb.Host{
 			Name:      hostName,
-			Endpoints: make(map[uint32]*routingpb.Endpoint),
+			Endpoints: make(map[int64]*routingpb.Endpoint),
 		}
 	}
 	host := group.Hosts[hostName]
@@ -76,11 +76,11 @@ func (r *RoutingTable) Delete(groupName string, hostName string, eidStr string) 
 	if err != nil {
 		return util.ErrorWithPos(err)
 	}
-	if _, ok := host.Endpoints[uint32(eid)]; !ok {
+	if _, ok := host.Endpoints[int64(eid)]; !ok {
 		return util.ErrorfWithPos("failed to delete endpoint, endpoint [%v] nost exist", eid)
 	}
 	// check delete
-	delete(host.Endpoints, uint32(eid))
+	delete(host.Endpoints, int64(eid))
 	mlog.Infof("delete endpoint [%v/%v/%v]", groupName, hostName, eid)
 
 	if len(host.Endpoints) == 0 {
@@ -94,7 +94,7 @@ func (r *RoutingTable) Delete(groupName string, hostName string, eidStr string) 
 	return nil
 }
 
-func (r *RoutingTable) GetLeaseID(groupName string, hostName string, eid uint32) (int64, error) {
+func (r *RoutingTable) GetLeaseID(groupName string, hostName string, eid int64) (int64, error) {
 	// check group
 	if _, ok := r.Groups[groupName]; !ok {
 		return 0, util.ErrorfWithPos("failed to delete endpoint: group [%v] nost exist", groupName)

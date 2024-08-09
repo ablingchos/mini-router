@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"strconv"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"git.woa.com/kefuai/mini-router/pkg/proto/providerpb"
@@ -14,16 +13,17 @@ import (
 	"git.woa.com/mfcn/ms-go/pkg/util"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/client/v3/concurrency"
+	"go.uber.org/zap"
 )
 
 const (
-	idMutexPrefix = "/mutex"
-	idPrefix      = "/id"
+	idMutexKey          = "/mutex/id"
+	idKey               = "/id"
+	routingHeartbeatKey = "/heartbeat"
 )
 
 type RegisterServer struct {
 	etcdClient *clientv3.Client
-	eidNumber  atomic.Int64
 
 	providerpb.UnimplementedProviderServiceServer
 }
@@ -47,8 +47,8 @@ func (r *RegisterServer) Register(ctx context.Context, req *providerpb.RegisterR
 		mlog.Errorf("failed to generate new gid: %v", err)
 		return nil, util.ErrorWithPos(err)
 	}
-	// 在etcd中注册的key，四段式: "/routing/group1/host1/eid"
-	keys := []string{routingTablePrefix, req.GroupName, req.HostName, strconv.Itoa(int(eid))}
+	// 在etcd中注册的key，四段式: "/heartbeat/group1/host1/eid"
+	keys := []string{routingHeartbeatKey, req.GroupName, req.HostName, strconv.Itoa(int(eid))}
 	endpointKey := "/" + strings.Join(keys, "/")
 	// 向etcd创建lease
 	leaseResp, err := r.etcdClient.Grant(ctx, int64(req.GetTimeout()))
@@ -67,8 +67,7 @@ func (r *RegisterServer) Register(ctx context.Context, req *providerpb.RegisterR
 	if err != nil {
 		return nil, util.ErrorWithPos(err)
 	}
-	_, err = r.etcdClient.Put(ctx, endpointKey, string(bytes), clientv3.WithLease(leaseResp.ID))
-	if err != nil {
+	if _, err = r.etcdClient.Put(ctx, endpointKey, string(bytes), clientv3.WithLease(leaseResp.ID)); err != nil {
 		return nil, util.ErrorWithPos(err)
 	}
 
@@ -81,8 +80,7 @@ func (r *RegisterServer) Register(ctx context.Context, req *providerpb.RegisterR
 
 func (r *RegisterServer) Heartbeat(ctx context.Context, req *providerpb.HeartbeatRequest) (*providerpb.HeartbeatReply, error) {
 	// keep alive
-	_, err := r.etcdClient.KeepAliveOnce(ctx, clientv3.LeaseID(req.GetLeaseId()))
-	if err != nil {
+	if _, err := r.etcdClient.KeepAliveOnce(ctx, clientv3.LeaseID(req.GetLeaseId())); err != nil {
 		mlog.Errorf("failed to keep alive endpoint: [%v/%v/%v]", req.GetGroupName(), req.GetHostName(), req.GetEid())
 		return nil, util.ErrorWithPos(err)
 	}
@@ -91,8 +89,7 @@ func (r *RegisterServer) Heartbeat(ctx context.Context, req *providerpb.Heartbea
 }
 
 func (r *RegisterServer) Unregister(ctx context.Context, req *providerpb.UnregisterRequest) (*providerpb.UnregisterReply, error) {
-	_, err := r.etcdClient.Revoke(ctx, clientv3.LeaseID(req.GetLeaseId()))
-	if err != nil {
+	if _, err := r.etcdClient.Revoke(ctx, clientv3.LeaseID(req.GetLeaseId())); err != nil {
 		return nil, util.ErrorWithPos(err)
 	}
 	mlog.Infof("[%v/%v/%v] unregister finished", req.GetGroupName(), req.GetHostName(), req.GetEid())
@@ -105,33 +102,35 @@ func (r *RegisterServer) generateEid(ctx context.Context) (int64, error) {
 	if err != nil {
 		return 0, util.ErrorWithPos(err)
 	}
-	defer session.Close()
 	// 创建一个分布式锁
-	mutex := concurrency.NewMutex(session, idMutexPrefix)
+	mutex := concurrency.NewMutex(session, idMutexKey)
 	// 获取锁
 	if err := mutex.Lock(ctx); err != nil {
 		return 0, util.ErrorWithPos(err)
 	}
 	defer func() {
 		if err := mutex.Unlock(ctx); err != nil {
-			mlog.Errorf("Failed to release lock: %v", err)
+			mlog.Errorf("failed to release lock: %v", err)
+		}
+		if err := session.Close(); err != nil {
+			mlog.Errorf("failed to close session: %v", err)
 		}
 	}()
 	// 使用事务初始化值
 	txn := r.etcdClient.Txn(ctx)
 	// 事务操作：如果键不存在，则初始化它
 	txnResp, err := txn.If(
-		clientv3.Compare(clientv3.Version(idPrefix), "=", 0),
+		clientv3.Compare(clientv3.Version(idKey), "=", 0),
 	).Then(
-		clientv3.OpPut(idPrefix, strconv.Itoa(1)),
+		clientv3.OpPut(idKey, strconv.Itoa(1)),
 	).Else(
-		clientv3.OpGet(idPrefix),
+		clientv3.OpGet(idKey),
 	).Commit()
-
 	if err != nil {
 		return 0, util.ErrorWithPos(err)
 	}
-	// 获取并更新eid
+
+	// 获取并更新eid，从1开始
 	eid := int64(1)
 	if txnResp.Succeeded {
 		mlog.Infof("created eid key for the first time")
@@ -143,10 +142,11 @@ func (r *RegisterServer) generateEid(ctx context.Context) (int64, error) {
 		eid = int64(value) + 1
 
 		// 更新值
-		_, err = r.etcdClient.Put(ctx, idPrefix, strconv.Itoa(int(eid)))
+		_, err = r.etcdClient.Put(ctx, idKey, strconv.Itoa(int(eid)))
 		if err != nil {
-			return 0, util.ErrorWithPos(err)
+			mlog.Fatal("failed to put eid to etcd", zap.Any("eid", eid))
 		}
+		mlog.Info("get eid from etcd", zap.Any("eid", eid))
 	}
 
 	return eid, nil

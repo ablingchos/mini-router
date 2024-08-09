@@ -24,9 +24,8 @@ var (
 )
 
 const (
-	routingTablePrefix = "routing"
-	timeZone           = "Asia/Shanghai"
-	snapshotInterval   = 2
+	timeZone         = "Asia/Shanghai"
+	snapshotInterval = 2
 )
 
 type Server struct {
