@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"encoding/json"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -23,7 +24,7 @@ const (
 	changeLogLength      = 3
 	routingTableKey      = "/routing-table"
 	routingTableMutexKey = "/mutex/routing-table"
-	routingDiffPrefix    = "/routing-diff"
+	routingLogPrefix     = "/routing-log"
 )
 
 type RoutingWatcher struct {
@@ -31,7 +32,7 @@ type RoutingWatcher struct {
 	routingTable *RoutingTable
 	mu           sync.RWMutex
 	version      atomic.Int64
-	changeLog    *ChangeRecords
+	logWriter    *LogWriter
 	ctx          context.Context
 }
 
@@ -40,8 +41,7 @@ func NewRoutingWatcher() (*RoutingWatcher, error) {
 		routingTable: &RoutingTable{
 			Groups: make(map[string]*routingpb.Group),
 		},
-		ctx:       context.Background(),
-		changeLog: &ChangeRecords{},
+		ctx: context.Background(),
 	}
 	client, err := clientv3.New(clientv3.Config{
 		Endpoints:   []string{etcdUri},
@@ -89,6 +89,7 @@ func (r *RoutingWatcher) initRoutingTable() error {
 			mlog.Errorf("failed to close session: %v", err)
 		}
 	}()
+
 	// 使用事务初始化值
 	txn := r.etcdClient.Txn(ctx)
 	// 事务操作：如果键不存在，则初始化它
@@ -124,21 +125,29 @@ func (r *RoutingWatcher) watchLoop() {
 	for watchResp := range watchChan {
 		for _, event := range watchResp.Events {
 			key := strings.TrimPrefix(string(event.Kv.Key), "/")
+			groupName, hostName, eidStr, err := parseHeartbeatKey(key)
+			if err != nil {
+				mlog.Warn("wrong heartbeat key format", zap.Any("key", key))
+				continue
+			}
 			mlog.Debugf("Received etcd event: %v", event)
 			switch event.Type {
 			case mvccpb.PUT:
-				value := &routingpb.Endpoint{}
-				if err := json.Unmarshal(event.Kv.Value, value); err != nil {
-					mlog.Errorf("failed to unmarshal value: %v", event.Kv.Value)
+				endpoint := &routingpb.Endpoint{}
+				if err := json.Unmarshal(event.Kv.Value, endpoint); err != nil {
+					mlog.Errorf("failed to unmarshal endpoint: %v", event.Kv.Value)
 					break
 				}
 				if event.IsCreate() {
-					r.addEndpoint(key, value)
+					r.addEndpoint(groupName, hostName, endpoint)
+					r.logWriter.insert(groupName, hostName, endpoint)
 				} else {
-					r.updateEndpoint(key, value)
+					r.updateEndpoint(groupName, hostName, endpoint)
+					r.logWriter.update(groupName, hostName, endpoint)
 				}
 			case mvccpb.DELETE:
-				r.deleteEndpoint(key)
+				r.deleteEndpoint(groupName, hostName, eidStr)
+				r.logWriter.delete(groupName, hostName, nil)
 			default:
 				mlog.Errorf("invalid type of etcd event: %v", event)
 			}
@@ -152,10 +161,13 @@ func (r *RoutingWatcher) updateLoop() {
 		select {
 		case <-ticker.C:
 			if err := r.updateRoutingToEtcd(); err != nil {
-				mlog.Errorf("failed to update routing to etcd: %v", err)
+				mlog.Warnf("failed to update routing to etcd: %v", err)
 				break
 			}
-
+			if err := r.reportChangeRecordsToEtcd(); err != nil {
+				mlog.Warnf("failed to report change log to etcd: %v", err)
+				break
+			}
 		case <-r.ctx.Done():
 			mlog.Info("received shutdown signal, update stopped")
 			return
@@ -169,17 +181,15 @@ func (r *RoutingWatcher) updateRoutingToEtcd() error {
 	if err != nil {
 		return util.ErrorWithPos(err)
 	}
-	ctx := context.Background()
-	txn := r.etcdClient.Txn(ctx)
-	txn.If(
+
+	txn := r.etcdClient.Txn(r.ctx)
+	txnResp, err := txn.If(
 		clientv3.Compare(clientv3.Version(routingTableKey), "<=", r.version.Load()),
 	).Then(
 		clientv3.OpPut(routingTableKey, string(bytes)),
 	).Else(
 		clientv3.OpGet(routingTableKey),
-	)
-
-	txnResp, err := txn.Commit()
+	).Commit()
 	if err != nil {
 		return util.ErrorWithPos(err)
 	}
@@ -196,31 +206,60 @@ func (r *RoutingWatcher) updateRoutingToEtcd() error {
 	return nil
 }
 
-func (r *RoutingWatcher) addEndpoint(key string, endpointInfo *routingpb.Endpoint) {
-	// split key
-	words := strings.Split(key, "/")
-	if len(words) != 4 || words[0] != routingHeartbeatKey {
-		mlog.Warn("wrong format to add an endpoint", zap.Any("key", key), zap.Any("value", endpointInfo))
-		return
+func (r *RoutingWatcher) reportChangeRecordsToEtcd() error {
+	version := r.version.Load()
+	records := r.logWriter.flushRecords(version)
+	bytes, err := json.Marshal(records)
+	if err != nil {
+		return util.ErrorWithPos(err)
 	}
 
+	addKey := routingLogPrefix + "/" + strconv.Itoa(int(version))
+	deleteKey := routingLogPrefix + "/" + strconv.Itoa(int(version-changeLogLength))
+	// 事务操作
+	txn := r.etcdClient.Txn(r.ctx)
+	txnResp, err := txn.If(
+		clientv3.Compare(clientv3.Version(addKey), "=", 0),
+	).Then(
+		clientv3.OpPut(addKey, string(bytes)),
+		clientv3.OpDelete(deleteKey),
+	).Else(
+		clientv3.OpGet(addKey),
+	).Commit()
+	if err != nil {
+		return util.ErrorWithPos(err)
+	}
+
+	if txnResp.Succeeded {
+		mlog.Infof("report change log successfully", zap.Any("change log", records))
+	} else {
+		mlog.Error("change log exists in etcd", zap.Any(addKey, string(txnResp.Responses[0].GetResponseRange().Kvs[0].Value)))
+		return util.ErrorfWithPos("failed to report change log, log already exists")
+	}
+
+	return nil
+}
+
+func (r *RoutingWatcher) addEndpoint(groupName string, hostName string, endpointInfo *routingpb.Endpoint) {
 	// add endpoint
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if err := r.routingTable.Insert(words[1], words[2], endpointInfo); err != nil {
+	if err := r.routingTable.Insert(groupName, hostName, endpointInfo); err != nil {
 		mlog.Errorf("failed to add endpoint, err: %v", err)
 	}
 }
 
-func (r *RoutingWatcher) updateEndpoint(key string, endpointInfo *routingpb.Endpoint) {
+func parseHeartbeatKey(key string) (string, string, string, error) {
 	// split key
 	words := strings.Split(key, "/")
 	if len(words) != 4 || words[0] != routingHeartbeatKey {
-		mlog.Warn("wrong format to add an endpoint", zap.Any("key", key), zap.Any("value", endpointInfo))
-		return
+		return "", "", "", util.ErrorfWithPos("wrong format to add an endpoint")
 	}
+	return words[1], words[2], words[3], nil
+}
 
+func (r *RoutingWatcher) updateEndpoint(groupName string, hostName string, endpointInfo *routingpb.Endpoint) {
 	// // update endpoint
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -228,21 +267,14 @@ func (r *RoutingWatcher) updateEndpoint(key string, endpointInfo *routingpb.Endp
 	// if err != nil {
 	// 	mlog.Errorf("failed to update endpoint, err: %v", err)
 	// }
-	mlog.Debugf("update endpoint [%v/%v/%v]", words[1], words[2], words[3])
 }
 
-func (r *RoutingWatcher) deleteEndpoint(key string) {
-	// split key
-	words := strings.Split(key, "/")
-	if len(words) != 4 || words[0] != routingHeartbeatKey {
-		mlog.Warn("wrong format to delete an endpoint", zap.Any("key", key))
-		return
-	}
+func (r *RoutingWatcher) deleteEndpoint(groupName string, hostName string, eidStr string) {
 	// delete key
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if err := r.routingTable.Delete(words[1], words[2], words[3]); err != nil {
+	if err := r.routingTable.Delete(groupName, hostName, eidStr); err != nil {
 		mlog.Errorf("failed to delete endpoint, err: %v", err)
 	}
 }
