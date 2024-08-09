@@ -16,7 +16,7 @@ message ConsumerInitRequest {
 
 message ConsumerInitReply {
   routingpb.Group group = 1;  // 包含所需host信息的路由表
-  int64 version         = 2;  // 最新的版本号
+  int64 version         = 2;  // 路由表当前版本号
 }
 
 message ConsumerUpdateRequest {
@@ -26,6 +26,8 @@ message ConsumerUpdateRequest {
 }
 
 message ConsumerUpdateReply {
-  routingpb.Group group = 1;  // 包含所需host信息的路由表
-  int64 version         = 2;  // 最新的版本号
+  routingpb.ChangeRecords changes = 1;  // 该consumer所需的日志信息
+  int64 version                   = 2;  // 路由表当前版本号
+  bool outdated                   = 3;  // 是否过期，过期则重发所有路由表
+  routingpb.Group group           = 4;  // 过期重发的全量路由表
 }

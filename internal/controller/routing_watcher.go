@@ -31,7 +31,7 @@ type RoutingWatcher struct {
 	etcdClient   *clientv3.Client
 	routingTable *RoutingTable
 	mu           sync.RWMutex
-	version      atomic.Int64
+	version      atomic.Int64 // routing table的version，log的version比routing table的version小1
 	logWriter    *LogWriter
 	ctx          context.Context
 }
@@ -182,9 +182,10 @@ func (r *RoutingWatcher) updateRoutingToEtcd() error {
 		return util.ErrorWithPos(err)
 	}
 
+	version := r.version.Load()
 	txn := r.etcdClient.Txn(r.ctx)
 	txnResp, err := txn.If(
-		clientv3.Compare(clientv3.Version(routingTableKey), "<=", r.version.Load()),
+		clientv3.Compare(clientv3.Version(routingTableKey), "<=", version),
 	).Then(
 		clientv3.OpPut(routingTableKey, string(bytes)),
 	).Else(
@@ -197,17 +198,17 @@ func (r *RoutingWatcher) updateRoutingToEtcd() error {
 	if txnResp.Succeeded {
 		r.version.Add(1)
 		mlog.Info("update routing table to etcd successfully",
-			zap.Any("routing table", routing), zap.Any("version", r.version.Load()))
+			zap.Any("routing table", routing), zap.Any("version", version))
 	} else {
 		mlog.Warn("routing table version higher than local version",
-			zap.Any("remote version", txnResp.Responses[0].GetResponseRange().Kvs[0].Version), zap.Any("local version", r.version.Load()))
+			zap.Any("remote version", txnResp.Responses[0].GetResponseRange().Kvs[0].Version), zap.Any("local version", version))
 		return util.ErrorfWithPos("failed to update routing table: version mismatched")
 	}
 	return nil
 }
 
 func (r *RoutingWatcher) reportChangeRecordsToEtcd() error {
-	version := r.version.Load()
+	version := r.version.Load() - 1
 	records := r.logWriter.flush(version)
 	bytes, err := json.Marshal(records)
 	if err != nil {
