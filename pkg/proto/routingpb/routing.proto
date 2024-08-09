@@ -45,3 +45,22 @@ enum Match {
   prefix = 0;  // 前缀匹配
   exact  = 1;  // 完全匹配
 }
+
+message ChangeRecord {
+  ChangeType type   = 1;
+  string group_name = 2;
+  string host_name  = 3;
+  Endpoint endpoint = 4;
+  int64 time_stamp  = 5;
+}
+
+message ChangeRecords {
+  repeated ChangeRecord records = 1;
+  int64 version                 = 2;
+}
+
+enum ChangeType {
+  add    = 0;
+  update = 1;
+  delete = 2;
+}

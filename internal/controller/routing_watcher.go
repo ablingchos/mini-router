@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"git.woa.com/kefuai/mini-router/pkg/proto/routingpb"
@@ -19,17 +20,19 @@ import (
 
 const (
 	updateInterval       = 2
+	changeLogLength      = 3
 	routingTableKey      = "/routing-table"
 	routingTableMutexKey = "/mutex/routing-table"
+	routingDiffPrefix    = "/routing-diff"
 )
 
 type RoutingWatcher struct {
 	etcdClient   *clientv3.Client
 	routingTable *RoutingTable
 	mu           sync.RWMutex
-	tableVersion int64
-	cancelWatch  context.CancelFunc
-	watchChan    chan struct{}
+	version      atomic.Int64
+	changeLog    *ChangeRecords
+	ctx          context.Context
 }
 
 func NewRoutingWatcher() (*RoutingWatcher, error) {
@@ -37,7 +40,8 @@ func NewRoutingWatcher() (*RoutingWatcher, error) {
 		routingTable: &RoutingTable{
 			Groups: make(map[string]*routingpb.Group),
 		},
-		watchChan: make(chan struct{}),
+		ctx:       context.Background(),
+		changeLog: &ChangeRecords{},
 	}
 	client, err := clientv3.New(clientv3.Config{
 		Endpoints:   []string{etcdUri},
@@ -56,14 +60,12 @@ func (r *RoutingWatcher) Run() {
 	}
 	go r.watchLoop()
 	go r.updateLoop()
+	mlog.Info("routing watcher start to work")
 }
 
 func (r *RoutingWatcher) Stop() {
 	mlog.Info("received shutdown signal, start to stop")
-	r.watchChan <- struct{}{}
-	if r.cancelWatch != nil {
-		r.cancelWatch()
-	}
+	r.ctx.Done()
 }
 
 func (r *RoutingWatcher) initRoutingTable() error {
@@ -102,7 +104,7 @@ func (r *RoutingWatcher) initRoutingTable() error {
 	}
 
 	if txnResp.Succeeded {
-		r.tableVersion = 1
+		r.version.Store(1)
 		mlog.Infof("created routing table key for the first time")
 	} else {
 		routingTable := &routingpb.RoutingTable{}
@@ -110,17 +112,15 @@ func (r *RoutingWatcher) initRoutingTable() error {
 			return util.ErrorWithPos(err)
 		}
 		r.routingTable = (*RoutingTable)(routingTable)
-		r.tableVersion = txnResp.Responses[0].GetResponseRange().Kvs[0].Version
-		mlog.Info("init routing watcher", zap.Any("routing table", r.routingTable), zap.Any("version", r.tableVersion))
+		r.version.Store(txnResp.Responses[0].GetResponseRange().Kvs[0].Version)
+		mlog.Info("init routing watcher", zap.Any("routing table", r.routingTable), zap.Any("version", r.version.Load()))
 	}
 
 	return nil
 }
 
 func (r *RoutingWatcher) watchLoop() {
-	ctx, cancel := context.WithCancel(context.Background())
-	r.cancelWatch = cancel
-	watchChan := r.etcdClient.Watch(ctx, routingHeartbeatKey, clientv3.WithPrefix())
+	watchChan := r.etcdClient.Watch(r.ctx, routingHeartbeatKey, clientv3.WithPrefix())
 	for watchResp := range watchChan {
 		for _, event := range watchResp.Events {
 			key := strings.TrimPrefix(string(event.Kv.Key), "/")
@@ -153,8 +153,10 @@ func (r *RoutingWatcher) updateLoop() {
 		case <-ticker.C:
 			if err := r.updateRoutingToEtcd(); err != nil {
 				mlog.Errorf("failed to update routing to etcd: %v", err)
+				break
 			}
-		case <-r.watchChan:
+
+		case <-r.ctx.Done():
 			mlog.Info("received shutdown signal, update stopped")
 			return
 		}
@@ -170,7 +172,7 @@ func (r *RoutingWatcher) updateRoutingToEtcd() error {
 	ctx := context.Background()
 	txn := r.etcdClient.Txn(ctx)
 	txn.If(
-		clientv3.Compare(clientv3.Version(routingTableKey), "<=", r.tableVersion),
+		clientv3.Compare(clientv3.Version(routingTableKey), "<=", r.version.Load()),
 	).Then(
 		clientv3.OpPut(routingTableKey, string(bytes)),
 	).Else(
@@ -183,12 +185,12 @@ func (r *RoutingWatcher) updateRoutingToEtcd() error {
 	}
 
 	if txnResp.Succeeded {
-		r.tableVersion++
+		r.version.Add(1)
 		mlog.Info("update routing table to etcd successfully",
-			zap.Any("routing table", routing), zap.Any("version", r.tableVersion))
+			zap.Any("routing table", routing), zap.Any("version", r.version.Load()))
 	} else {
 		mlog.Warn("routing table version higher than local version",
-			zap.Any("remote version", txnResp.Responses[0].GetResponseRange().Kvs[0].Version), zap.Any("local version", r.tableVersion))
+			zap.Any("remote version", txnResp.Responses[0].GetResponseRange().Kvs[0].Version), zap.Any("local version", r.version.Load()))
 		return util.ErrorfWithPos("failed to update routing table: version mismatched")
 	}
 	return nil
