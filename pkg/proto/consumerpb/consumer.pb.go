@@ -7,9 +7,11 @@
 package consumerpb
 
 import (
+	routingpb "git.woa.com/kefuai/mini-router/pkg/proto/routingpb"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
+	sync "sync"
 )
 
 const (
@@ -19,25 +21,315 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type ConsumerInitRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	GroupName string   `protobuf:"bytes,1,opt,name=group_name,json=groupName,proto3" json:"group_name,omitempty"` // 所在的group
+	HostName  []string `protobuf:"bytes,2,rep,name=host_name,json=hostName,proto3" json:"host_name,omitempty"`    // 需要的host列表
+}
+
+func (x *ConsumerInitRequest) Reset() {
+	*x = ConsumerInitRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_pkg_proto_consumerpb_consumer_proto_msgTypes[0]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *ConsumerInitRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConsumerInitRequest) ProtoMessage() {}
+
+func (x *ConsumerInitRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_pkg_proto_consumerpb_consumer_proto_msgTypes[0]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConsumerInitRequest.ProtoReflect.Descriptor instead.
+func (*ConsumerInitRequest) Descriptor() ([]byte, []int) {
+	return file_pkg_proto_consumerpb_consumer_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *ConsumerInitRequest) GetGroupName() string {
+	if x != nil {
+		return x.GroupName
+	}
+	return ""
+}
+
+func (x *ConsumerInitRequest) GetHostName() []string {
+	if x != nil {
+		return x.HostName
+	}
+	return nil
+}
+
+type ConsumerInitReply struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Group   *routingpb.Group `protobuf:"bytes,1,opt,name=group,proto3" json:"group,omitempty"`      // 包含所需host信息的路由表
+	Version int64            `protobuf:"varint,2,opt,name=version,proto3" json:"version,omitempty"` // 最新的版本号
+}
+
+func (x *ConsumerInitReply) Reset() {
+	*x = ConsumerInitReply{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_pkg_proto_consumerpb_consumer_proto_msgTypes[1]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *ConsumerInitReply) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConsumerInitReply) ProtoMessage() {}
+
+func (x *ConsumerInitReply) ProtoReflect() protoreflect.Message {
+	mi := &file_pkg_proto_consumerpb_consumer_proto_msgTypes[1]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConsumerInitReply.ProtoReflect.Descriptor instead.
+func (*ConsumerInitReply) Descriptor() ([]byte, []int) {
+	return file_pkg_proto_consumerpb_consumer_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *ConsumerInitReply) GetGroup() *routingpb.Group {
+	if x != nil {
+		return x.Group
+	}
+	return nil
+}
+
+func (x *ConsumerInitReply) GetVersion() int64 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
+}
+
+type ConsumerUpdateRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	GroupName string   `protobuf:"bytes,1,opt,name=group_name,json=groupName,proto3" json:"group_name,omitempty"` // 所在的group
+	HostName  []string `protobuf:"bytes,2,rep,name=host_name,json=hostName,proto3" json:"host_name,omitempty"`    // 需要的host列表
+	Version   int64    `protobuf:"varint,3,opt,name=version,proto3" json:"version,omitempty"`                     // 上次所获取到的版本号
+}
+
+func (x *ConsumerUpdateRequest) Reset() {
+	*x = ConsumerUpdateRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_pkg_proto_consumerpb_consumer_proto_msgTypes[2]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *ConsumerUpdateRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConsumerUpdateRequest) ProtoMessage() {}
+
+func (x *ConsumerUpdateRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_pkg_proto_consumerpb_consumer_proto_msgTypes[2]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConsumerUpdateRequest.ProtoReflect.Descriptor instead.
+func (*ConsumerUpdateRequest) Descriptor() ([]byte, []int) {
+	return file_pkg_proto_consumerpb_consumer_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *ConsumerUpdateRequest) GetGroupName() string {
+	if x != nil {
+		return x.GroupName
+	}
+	return ""
+}
+
+func (x *ConsumerUpdateRequest) GetHostName() []string {
+	if x != nil {
+		return x.HostName
+	}
+	return nil
+}
+
+func (x *ConsumerUpdateRequest) GetVersion() int64 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
+}
+
+type ConsumerUpdateReply struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Group   *routingpb.Group `protobuf:"bytes,1,opt,name=group,proto3" json:"group,omitempty"`      // 包含所需host信息的路由表
+	Version int64            `protobuf:"varint,2,opt,name=version,proto3" json:"version,omitempty"` // 最新的版本号
+}
+
+func (x *ConsumerUpdateReply) Reset() {
+	*x = ConsumerUpdateReply{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_pkg_proto_consumerpb_consumer_proto_msgTypes[3]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *ConsumerUpdateReply) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConsumerUpdateReply) ProtoMessage() {}
+
+func (x *ConsumerUpdateReply) ProtoReflect() protoreflect.Message {
+	mi := &file_pkg_proto_consumerpb_consumer_proto_msgTypes[3]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConsumerUpdateReply.ProtoReflect.Descriptor instead.
+func (*ConsumerUpdateReply) Descriptor() ([]byte, []int) {
+	return file_pkg_proto_consumerpb_consumer_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *ConsumerUpdateReply) GetGroup() *routingpb.Group {
+	if x != nil {
+		return x.Group
+	}
+	return nil
+}
+
+func (x *ConsumerUpdateReply) GetVersion() int64 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
+}
+
 var File_pkg_proto_consumerpb_consumer_proto protoreflect.FileDescriptor
 
 var file_pkg_proto_consumerpb_consumer_proto_rawDesc = []byte{
 	0x0a, 0x23, 0x70, 0x6b, 0x67, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2f, 0x63, 0x6f, 0x6e, 0x73,
 	0x75, 0x6d, 0x65, 0x72, 0x70, 0x62, 0x2f, 0x63, 0x6f, 0x6e, 0x73, 0x75, 0x6d, 0x65, 0x72, 0x2e,
 	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x12, 0x0a, 0x63, 0x6f, 0x6e, 0x73, 0x75, 0x6d, 0x65, 0x72, 0x70,
-	0x62, 0x42, 0x35, 0x5a, 0x33, 0x67, 0x69, 0x74, 0x2e, 0x77, 0x6f, 0x61, 0x2e, 0x63, 0x6f, 0x6d,
-	0x2f, 0x6b, 0x65, 0x66, 0x75, 0x61, 0x69, 0x2f, 0x6d, 0x69, 0x6e, 0x69, 0x2d, 0x72, 0x6f, 0x75,
-	0x74, 0x65, 0x72, 0x2f, 0x70, 0x6b, 0x67, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2f, 0x63, 0x6f,
-	0x6e, 0x73, 0x75, 0x6d, 0x65, 0x72, 0x70, 0x62, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x62, 0x1a, 0x21, 0x70, 0x6b, 0x67, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2f, 0x72, 0x6f, 0x75,
+	0x74, 0x69, 0x6e, 0x67, 0x70, 0x62, 0x2f, 0x72, 0x6f, 0x75, 0x74, 0x69, 0x6e, 0x67, 0x2e, 0x70,
+	0x72, 0x6f, 0x74, 0x6f, 0x22, 0x51, 0x0a, 0x13, 0x43, 0x6f, 0x6e, 0x73, 0x75, 0x6d, 0x65, 0x72,
+	0x49, 0x6e, 0x69, 0x74, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x1d, 0x0a, 0x0a, 0x67,
+	0x72, 0x6f, 0x75, 0x70, 0x5f, 0x6e, 0x61, 0x6d, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52,
+	0x09, 0x67, 0x72, 0x6f, 0x75, 0x70, 0x4e, 0x61, 0x6d, 0x65, 0x12, 0x1b, 0x0a, 0x09, 0x68, 0x6f,
+	0x73, 0x74, 0x5f, 0x6e, 0x61, 0x6d, 0x65, 0x18, 0x02, 0x20, 0x03, 0x28, 0x09, 0x52, 0x08, 0x68,
+	0x6f, 0x73, 0x74, 0x4e, 0x61, 0x6d, 0x65, 0x22, 0x55, 0x0a, 0x11, 0x43, 0x6f, 0x6e, 0x73, 0x75,
+	0x6d, 0x65, 0x72, 0x49, 0x6e, 0x69, 0x74, 0x52, 0x65, 0x70, 0x6c, 0x79, 0x12, 0x26, 0x0a, 0x05,
+	0x67, 0x72, 0x6f, 0x75, 0x70, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x10, 0x2e, 0x72, 0x6f,
+	0x75, 0x74, 0x69, 0x6e, 0x67, 0x70, 0x62, 0x2e, 0x47, 0x72, 0x6f, 0x75, 0x70, 0x52, 0x05, 0x67,
+	0x72, 0x6f, 0x75, 0x70, 0x12, 0x18, 0x0a, 0x07, 0x76, 0x65, 0x72, 0x73, 0x69, 0x6f, 0x6e, 0x18,
+	0x02, 0x20, 0x01, 0x28, 0x03, 0x52, 0x07, 0x76, 0x65, 0x72, 0x73, 0x69, 0x6f, 0x6e, 0x22, 0x6d,
+	0x0a, 0x15, 0x43, 0x6f, 0x6e, 0x73, 0x75, 0x6d, 0x65, 0x72, 0x55, 0x70, 0x64, 0x61, 0x74, 0x65,
+	0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x1d, 0x0a, 0x0a, 0x67, 0x72, 0x6f, 0x75, 0x70,
+	0x5f, 0x6e, 0x61, 0x6d, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x09, 0x67, 0x72, 0x6f,
+	0x75, 0x70, 0x4e, 0x61, 0x6d, 0x65, 0x12, 0x1b, 0x0a, 0x09, 0x68, 0x6f, 0x73, 0x74, 0x5f, 0x6e,
+	0x61, 0x6d, 0x65, 0x18, 0x02, 0x20, 0x03, 0x28, 0x09, 0x52, 0x08, 0x68, 0x6f, 0x73, 0x74, 0x4e,
+	0x61, 0x6d, 0x65, 0x12, 0x18, 0x0a, 0x07, 0x76, 0x65, 0x72, 0x73, 0x69, 0x6f, 0x6e, 0x18, 0x03,
+	0x20, 0x01, 0x28, 0x03, 0x52, 0x07, 0x76, 0x65, 0x72, 0x73, 0x69, 0x6f, 0x6e, 0x22, 0x57, 0x0a,
+	0x13, 0x43, 0x6f, 0x6e, 0x73, 0x75, 0x6d, 0x65, 0x72, 0x55, 0x70, 0x64, 0x61, 0x74, 0x65, 0x52,
+	0x65, 0x70, 0x6c, 0x79, 0x12, 0x26, 0x0a, 0x05, 0x67, 0x72, 0x6f, 0x75, 0x70, 0x18, 0x01, 0x20,
+	0x01, 0x28, 0x0b, 0x32, 0x10, 0x2e, 0x72, 0x6f, 0x75, 0x74, 0x69, 0x6e, 0x67, 0x70, 0x62, 0x2e,
+	0x47, 0x72, 0x6f, 0x75, 0x70, 0x52, 0x05, 0x67, 0x72, 0x6f, 0x75, 0x70, 0x12, 0x18, 0x0a, 0x07,
+	0x76, 0x65, 0x72, 0x73, 0x69, 0x6f, 0x6e, 0x18, 0x02, 0x20, 0x01, 0x28, 0x03, 0x52, 0x07, 0x76,
+	0x65, 0x72, 0x73, 0x69, 0x6f, 0x6e, 0x32, 0xb7, 0x01, 0x0a, 0x0f, 0x43, 0x6f, 0x6e, 0x73, 0x75,
+	0x6d, 0x65, 0x72, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x12, 0x4e, 0x0a, 0x0c, 0x43, 0x6f,
+	0x6e, 0x73, 0x75, 0x6d, 0x65, 0x72, 0x49, 0x6e, 0x69, 0x74, 0x12, 0x1f, 0x2e, 0x63, 0x6f, 0x6e,
+	0x73, 0x75, 0x6d, 0x65, 0x72, 0x70, 0x62, 0x2e, 0x43, 0x6f, 0x6e, 0x73, 0x75, 0x6d, 0x65, 0x72,
+	0x49, 0x6e, 0x69, 0x74, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x1d, 0x2e, 0x63, 0x6f,
+	0x6e, 0x73, 0x75, 0x6d, 0x65, 0x72, 0x70, 0x62, 0x2e, 0x43, 0x6f, 0x6e, 0x73, 0x75, 0x6d, 0x65,
+	0x72, 0x49, 0x6e, 0x69, 0x74, 0x52, 0x65, 0x70, 0x6c, 0x79, 0x12, 0x54, 0x0a, 0x0e, 0x43, 0x6f,
+	0x6e, 0x73, 0x75, 0x6d, 0x65, 0x72, 0x55, 0x70, 0x64, 0x61, 0x74, 0x65, 0x12, 0x21, 0x2e, 0x63,
+	0x6f, 0x6e, 0x73, 0x75, 0x6d, 0x65, 0x72, 0x70, 0x62, 0x2e, 0x43, 0x6f, 0x6e, 0x73, 0x75, 0x6d,
+	0x65, 0x72, 0x55, 0x70, 0x64, 0x61, 0x74, 0x65, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a,
+	0x1f, 0x2e, 0x63, 0x6f, 0x6e, 0x73, 0x75, 0x6d, 0x65, 0x72, 0x70, 0x62, 0x2e, 0x43, 0x6f, 0x6e,
+	0x73, 0x75, 0x6d, 0x65, 0x72, 0x55, 0x70, 0x64, 0x61, 0x74, 0x65, 0x52, 0x65, 0x70, 0x6c, 0x79,
+	0x42, 0x35, 0x5a, 0x33, 0x67, 0x69, 0x74, 0x2e, 0x77, 0x6f, 0x61, 0x2e, 0x63, 0x6f, 0x6d, 0x2f,
+	0x6b, 0x65, 0x66, 0x75, 0x61, 0x69, 0x2f, 0x6d, 0x69, 0x6e, 0x69, 0x2d, 0x72, 0x6f, 0x75, 0x74,
+	0x65, 0x72, 0x2f, 0x70, 0x6b, 0x67, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2f, 0x63, 0x6f, 0x6e,
+	0x73, 0x75, 0x6d, 0x65, 0x72, 0x70, 0x62, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
-var file_pkg_proto_consumerpb_consumer_proto_goTypes = []interface{}{}
+var (
+	file_pkg_proto_consumerpb_consumer_proto_rawDescOnce sync.Once
+	file_pkg_proto_consumerpb_consumer_proto_rawDescData = file_pkg_proto_consumerpb_consumer_proto_rawDesc
+)
+
+func file_pkg_proto_consumerpb_consumer_proto_rawDescGZIP() []byte {
+	file_pkg_proto_consumerpb_consumer_proto_rawDescOnce.Do(func() {
+		file_pkg_proto_consumerpb_consumer_proto_rawDescData = protoimpl.X.CompressGZIP(file_pkg_proto_consumerpb_consumer_proto_rawDescData)
+	})
+	return file_pkg_proto_consumerpb_consumer_proto_rawDescData
+}
+
+var file_pkg_proto_consumerpb_consumer_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_pkg_proto_consumerpb_consumer_proto_goTypes = []interface{}{
+	(*ConsumerInitRequest)(nil),   // 0: consumerpb.ConsumerInitRequest
+	(*ConsumerInitReply)(nil),     // 1: consumerpb.ConsumerInitReply
+	(*ConsumerUpdateRequest)(nil), // 2: consumerpb.ConsumerUpdateRequest
+	(*ConsumerUpdateReply)(nil),   // 3: consumerpb.ConsumerUpdateReply
+	(*routingpb.Group)(nil),       // 4: routingpb.Group
+}
 var file_pkg_proto_consumerpb_consumer_proto_depIdxs = []int32{
-	0, // [0:0] is the sub-list for method output_type
-	0, // [0:0] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	4, // 0: consumerpb.ConsumerInitReply.group:type_name -> routingpb.Group
+	4, // 1: consumerpb.ConsumerUpdateReply.group:type_name -> routingpb.Group
+	0, // 2: consumerpb.ConsumerService.ConsumerInit:input_type -> consumerpb.ConsumerInitRequest
+	2, // 3: consumerpb.ConsumerService.ConsumerUpdate:input_type -> consumerpb.ConsumerUpdateRequest
+	1, // 4: consumerpb.ConsumerService.ConsumerInit:output_type -> consumerpb.ConsumerInitReply
+	3, // 5: consumerpb.ConsumerService.ConsumerUpdate:output_type -> consumerpb.ConsumerUpdateReply
+	4, // [4:6] is the sub-list for method output_type
+	2, // [2:4] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_pkg_proto_consumerpb_consumer_proto_init() }
@@ -45,18 +337,69 @@ func file_pkg_proto_consumerpb_consumer_proto_init() {
 	if File_pkg_proto_consumerpb_consumer_proto != nil {
 		return
 	}
+	if !protoimpl.UnsafeEnabled {
+		file_pkg_proto_consumerpb_consumer_proto_msgTypes[0].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*ConsumerInitRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_pkg_proto_consumerpb_consumer_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*ConsumerInitReply); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_pkg_proto_consumerpb_consumer_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*ConsumerUpdateRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_pkg_proto_consumerpb_consumer_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*ConsumerUpdateReply); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_pkg_proto_consumerpb_consumer_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   0,
+			NumMessages:   4,
 			NumExtensions: 0,
-			NumServices:   0,
+			NumServices:   1,
 		},
 		GoTypes:           file_pkg_proto_consumerpb_consumer_proto_goTypes,
 		DependencyIndexes: file_pkg_proto_consumerpb_consumer_proto_depIdxs,
+		MessageInfos:      file_pkg_proto_consumerpb_consumer_proto_msgTypes,
 	}.Build()
 	File_pkg_proto_consumerpb_consumer_proto = out.File
 	file_pkg_proto_consumerpb_consumer_proto_rawDesc = nil

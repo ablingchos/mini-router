@@ -2,3 +2,30 @@ syntax = "proto3";
 
 package consumerpb;
 option go_package = "git.woa.com/kefuai/mini-router/pkg/proto/consumerpb";
+import "pkg/proto/routingpb/routing.proto";
+
+service ConsumerService {
+  rpc ConsumerInit(ConsumerInitRequest) returns (ConsumerInitReply);
+  rpc ConsumerUpdate(ConsumerUpdateRequest) returns (ConsumerUpdateReply);
+}
+
+message ConsumerInitRequest {
+  string group_name         = 1;  // 所在的group
+  repeated string host_name = 2;  // 需要的host列表
+}
+
+message ConsumerInitReply {
+  routingpb.Group group = 1;  // 包含所需host信息的路由表
+  int64 version         = 2;  // 最新的版本号
+}
+
+message ConsumerUpdateRequest {
+  string group_name         = 1;  // 所在的group
+  repeated string host_name = 2;  // 需要的host列表
+  int64 version             = 3;  // 上次所获取到的版本号
+}
+
+message ConsumerUpdateReply {
+  routingpb.Group group = 1;  // 包含所需host信息的路由表
+  int64 version         = 2;  // 最新的版本号
+}
