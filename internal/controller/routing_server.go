@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"git.woa.com/kefuai/mini-router/internal/common"
 	"git.woa.com/kefuai/mini-router/pkg/proto/consumerpb"
 	"git.woa.com/kefuai/mini-router/pkg/proto/routingpb"
 	"git.woa.com/mfcn/ms-go/pkg/mlog"
@@ -22,7 +23,7 @@ const (
 
 type DiscoverServer struct {
 	etcdClient   *clientv3.Client
-	routingTable *RoutingTable
+	routingTable *common.RoutingTable
 	changeLogs   []*routingpb.ChangeRecords
 	mu           sync.RWMutex
 	version      atomic.Int64

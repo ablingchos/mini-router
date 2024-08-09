@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"git.woa.com/kefuai/mini-router/internal/common"
 	"git.woa.com/kefuai/mini-router/pkg/proto/routingpb"
 	"git.woa.com/mfcn/ms-go/pkg/mlog"
 	"git.woa.com/mfcn/ms-go/pkg/util"
@@ -30,7 +31,7 @@ const (
 
 type RoutingWatcher struct {
 	etcdClient   *clientv3.Client
-	routingTable *RoutingTable
+	routingTable *common.RoutingTable
 	mu           sync.RWMutex
 	version      atomic.Int64 // routing table的version = log的version + 1
 	logWriter    *LogWriter
@@ -41,7 +42,7 @@ type RoutingWatcher struct {
 
 func NewRoutingWatcher() (*RoutingWatcher, error) {
 	routingWatcher := &RoutingWatcher{
-		routingTable: &RoutingTable{
+		routingTable: &common.RoutingTable{
 			Groups: make(map[string]*routingpb.Group),
 		},
 	}
@@ -124,7 +125,7 @@ func (r *RoutingWatcher) initRoutingTable() error {
 		if err := json.Unmarshal(txnResp.Responses[0].GetResponseRange().Kvs[0].Value, routingTable); err != nil {
 			return util.ErrorWithPos(err)
 		}
-		r.routingTable = (*RoutingTable)(routingTable)
+		r.routingTable = (*common.RoutingTable)(routingTable)
 		r.version.Store(txnResp.Responses[0].GetResponseRange().Kvs[0].Version)
 		mlog.Info("init routing watcher", zap.Any("routing table", r.routingTable), zap.Any("version", r.version.Load()))
 	}

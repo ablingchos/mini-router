@@ -3,13 +3,12 @@ package provider
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"os"
 	"time"
 
+	"git.woa.com/kefuai/mini-router/internal/common"
 	"git.woa.com/kefuai/mini-router/pkg/proto/providerpb"
 	"git.woa.com/mfcn/ms-go/pkg/mlog"
 	"git.woa.com/mfcn/ms-go/pkg/util"
@@ -23,7 +22,7 @@ const (
 )
 
 func (p *Provider) register(configPath string) error {
-	ip, err := getIpAddr()
+	ip, err := common.GetIpAddr()
 	if err != nil {
 		return util.ErrorWithPos(err)
 	}
@@ -117,19 +116,6 @@ func (p *Provider) unregister() {
 		return
 	}
 	mlog.Info("unregister successfully")
-}
-
-func getIpAddr() (string, error) {
-	conn, err := net.Dial("udp", "8.8.8.8:80")
-
-	if err != nil {
-		fmt.Println(err)
-		return "", util.ErrorfWithPos("failed to dial target addr")
-	}
-	defer conn.Close()
-	localAddr := conn.LocalAddr().(*net.UDPAddr)
-
-	return localAddr.IP.String(), nil
 }
 
 func (p *Provider) sendPostRequest(path string, reqBody []byte) ([]byte, error) {

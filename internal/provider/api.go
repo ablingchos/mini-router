@@ -11,14 +11,14 @@ type Provider struct {
 	Host             string
 	Ip               string
 	Port             string
-	Timeout          int32
+	Timeout          int64
 	eid              *Eid
-	httpClient       http.Client
+	httpClient       *http.Client
 	stopCh           chan struct{}
 }
 
 type Eid struct {
-	Eid uint32 `json:"eid"`
+	Eid int64 `json:"eid"`
 }
 
 var (
@@ -37,7 +37,7 @@ func GetProvider(temp *Provider) *Provider {
 // 被调方注册
 func (p *Provider) Register(configPath string) error {
 	once.Do(func() {
-		p.httpClient = *http.DefaultClient
+		p.httpClient = http.DefaultClient
 		p.stopCh = make(chan struct{})
 	})
 	return p.register(configPath)
