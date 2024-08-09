@@ -16,12 +16,19 @@ import (
 	"go.uber.org/zap"
 )
 
+const (
+	pullInterval = 5
+)
+
 type DiscoverServer struct {
-	etcdClient *clientv3.Client
-	changeLogs []*routingpb.ChangeRecords
-	mu         sync.RWMutex
-	version    atomic.Int64
-	ctx        context.Context
+	etcdClient   *clientv3.Client
+	routingTable *RoutingTable
+	changeLogs   []*routingpb.ChangeRecords
+	mu           sync.RWMutex
+	version      atomic.Int64
+	ctx          context.Context
+	cancelFunc   context.CancelFunc
+	loc          *time.Location
 
 	consumerpb.UnimplementedConsumerServiceServer
 }
@@ -38,11 +45,32 @@ func NewRoutingServer() (*DiscoverServer, error) {
 		return nil, util.ErrorWithPos(err)
 	}
 	server.etcdClient = client
+	ctx, cancel := context.WithCancel(context.Background())
+	server.ctx = ctx
+	server.cancelFunc = cancel
 	return server, nil
 }
 
 func (s *DiscoverServer) Run() {
+	go s.watchLoop()
+	go s.pullLoop()
+}
 
+func (s *DiscoverServer) Stop() {
+	s.cancelFunc()
+}
+
+func (s *DiscoverServer) pullLoop() {
+	ticker := time.NewTicker(pullInterval * time.Second)
+	for {
+		select {
+		case <-ticker.C:
+
+		case <-s.ctx.Done():
+			mlog.Info("pull loop stopped")
+			return
+		}
+	}
 }
 
 func (s *DiscoverServer) watchLoop() {
@@ -61,21 +89,37 @@ func (s *DiscoverServer) watchLoop() {
 					mlog.Warn("change log put again", zap.Any("change log", log))
 					break
 				}
-
+				s.updateLog(log)
 			}
 		}
 	}
 }
 
-func (s *DiscoverServer) formatLog(originLog *routingpb.ChangeRecords) error {
-	patch := RoutingTable{
-		Groups: make(map[string]*routingpb.Group),
-	}
+func (s *DiscoverServer) updateLog(log *routingpb.ChangeRecords) {
 	currentVersion := s.version.Load()
-	targetVersion := originLog.GetVersion()
+	targetVersion := log.GetVersion()
 	if currentVersion >= targetVersion || currentVersion+3 < targetVersion {
 		mlog.Fatal("log version mismatched", zap.Any("current log version", currentVersion), zap.Any("target version", targetVersion))
 	}
 
-	return nil
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	// 对头出队
+	s.changeLogs = s.changeLogs[1:]
+	// 队尾入队
+	s.changeLogs = append(s.changeLogs, log)
+	mlog.Info("updated log", zap.Any("log version", targetVersion), zap.Any("log", log))
+}
+
+func (s *DiscoverServer) ConsumerInit(context.Context, *consumerpb.ConsumerInitRequest) (*consumerpb.ConsumerInitReply, error) {
+	resp, err := s.etcdClient.Get(s.ctx, routingTableKey)
+	if err != nil {
+		mlog.Warnf("failed to get routing table from etcd: %v", err)
+		return nil, util.ErrorWithPos(err)
+	}
+
+	return nil, nil
+}
+func (s *DiscoverServer) ConsumerUpdate(context.Context, *consumerpb.ConsumerUpdateRequest) (*consumerpb.ConsumerUpdateReply, error) {
+	return nil, nil
 }

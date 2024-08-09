@@ -1,5 +1,3 @@
-git.woa.com/kefuai/mini-router v0.0.0-20240809085042-f18b52e3fdfb h1:URYm9hVoMgfxrcpruCedW+NDm+nCRmsxX841AQQ+KEs=
-git.woa.com/kefuai/mini-router v0.0.0-20240809085042-f18b52e3fdfb/go.mod h1:Wh3WGjZMndydjdUkw1XVqfczbYyPkTcA5ROu939FA7c=
 git.woa.com/mfcn/ms-go v0.4.74 h1:crWPRhOATg5hrWtx4FcWRIqzOScbTcnnpuJxjOKSjNM=
 git.woa.com/mfcn/ms-go v0.4.74/go.mod h1:lX3nEpzj1aSlNt2cEWSTVRYXJdHOoyvkcz14Ym/wXdE=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=

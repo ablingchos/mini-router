@@ -1,9 +1,8 @@
-module mini-router
+module git.woa.com/kefuai/mini-router
 
 go 1.21.1
 
 require (
-	git.woa.com/kefuai/mini-router v0.0.0-20240809085042-f18b52e3fdfb
 	git.woa.com/mfcn/ms-go v0.4.74
 	google.golang.org/grpc v1.65.0
 	google.golang.org/protobuf v1.34.2

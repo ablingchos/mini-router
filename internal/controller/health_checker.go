@@ -28,7 +28,7 @@ type RegisterServer struct {
 	providerpb.UnimplementedProviderServiceServer
 }
 
-func NewRegisterServer() (*RegisterServer, error) {
+func NewRegisterServer(port string) (*RegisterServer, error) {
 	registerServer := &RegisterServer{}
 	client, err := clientv3.New(clientv3.Config{
 		Endpoints:   []string{etcdUri},

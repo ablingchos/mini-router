@@ -19,12 +19,7 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
-var (
-	Location *time.Location
-)
-
 const (
-	timeZone         = "Asia/Shanghai"
 	snapshotInterval = 2
 )
 

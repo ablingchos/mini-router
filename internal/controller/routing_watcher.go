@@ -25,15 +25,18 @@ const (
 	routingTableKey      = "/routing-table"
 	routingTableMutexKey = "/mutex/routing-table"
 	routingLogPrefix     = "/routing-log"
+	TimeZone             = "Asia/Shanghai"
 )
 
 type RoutingWatcher struct {
 	etcdClient   *clientv3.Client
 	routingTable *RoutingTable
 	mu           sync.RWMutex
-	version      atomic.Int64 // routing table的version，log的version比routing table的version小1
+	version      atomic.Int64 // routing table的version = log的version + 1
 	logWriter    *LogWriter
 	ctx          context.Context
+	cancelFunc   context.CancelFunc
+	loc          *time.Location
 }
 
 func NewRoutingWatcher() (*RoutingWatcher, error) {
@@ -41,7 +44,6 @@ func NewRoutingWatcher() (*RoutingWatcher, error) {
 		routingTable: &RoutingTable{
 			Groups: make(map[string]*routingpb.Group),
 		},
-		ctx: context.Background(),
 	}
 	client, err := clientv3.New(clientv3.Config{
 		Endpoints:   []string{etcdUri},
@@ -50,7 +52,16 @@ func NewRoutingWatcher() (*RoutingWatcher, error) {
 	if err != nil {
 		return nil, util.ErrorWithPos(err)
 	}
+	loc, err := time.LoadLocation(TimeZone)
+	if err != nil {
+		return nil, util.ErrorWithPos(err)
+	}
+	routingWatcher.loc = loc
 	routingWatcher.etcdClient = client
+	routingWatcher.logWriter = NewLogWriter()
+	ctx, cancel := context.WithCancel(context.Background())
+	routingWatcher.ctx = ctx
+	routingWatcher.cancelFunc = cancel
 	return routingWatcher, nil
 }
 
@@ -65,7 +76,8 @@ func (r *RoutingWatcher) Run() {
 
 func (r *RoutingWatcher) Stop() {
 	mlog.Info("received shutdown signal, start to stop")
-	r.ctx.Done()
+	r.etcdClient.Close()
+	r.cancelFunc()
 }
 
 func (r *RoutingWatcher) initRoutingTable() error {
@@ -140,14 +152,14 @@ func (r *RoutingWatcher) watchLoop() {
 				}
 				if event.IsCreate() {
 					r.addEndpoint(groupName, hostName, endpoint)
-					r.logWriter.write(groupName, hostName, endpoint, routingpb.ChangeType_add)
+					r.logWriter.write(groupName, hostName, endpoint, routingpb.ChangeType_add, r.loc)
 				} else {
 					r.updateEndpoint(groupName, hostName, endpoint)
-					r.logWriter.write(groupName, hostName, endpoint, routingpb.ChangeType_update)
+					r.logWriter.write(groupName, hostName, endpoint, routingpb.ChangeType_update, r.loc)
 				}
 			case mvccpb.DELETE:
 				r.deleteEndpoint(groupName, hostName, eidStr)
-				r.logWriter.write(groupName, hostName, nil, routingpb.ChangeType_delete)
+				r.logWriter.write(groupName, hostName, nil, routingpb.ChangeType_delete, r.loc)
 			default:
 				mlog.Errorf("invalid type of etcd event: %v", event)
 			}
@@ -208,6 +220,7 @@ func (r *RoutingWatcher) updateRoutingToEtcd() error {
 }
 
 func (r *RoutingWatcher) reportChangeRecordsToEtcd() error {
+	// log version = routing table version - 1
 	version := r.version.Load() - 1
 	records := r.logWriter.flush(version)
 	bytes, err := json.Marshal(records)
