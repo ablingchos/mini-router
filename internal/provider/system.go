@@ -1,18 +1,75 @@
 package provider
 
 import (
+	"context"
+	"os"
+	"sync"
 	"time"
 
+	"git.woa.com/kefuai/mini-router/internal/common"
 	"git.woa.com/kefuai/mini-router/pkg/proto/providerpb"
 	"git.woa.com/mfcn/ms-go/pkg/mlog"
 	"git.woa.com/mfcn/ms-go/pkg/util"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"gopkg.in/yaml.v2"
 )
 
 const (
-	RegisterPath   = "/provider/register"
-	HeartbeatPath  = "/provider/heartbeat"
-	UnregisterPath = "/provider/unregister"
+	healthCheckAddr = "localhost:5100"
 )
+
+var (
+	once     sync.Once
+	provider *Provider
+)
+
+type ProviderConfig providerpb.RegisterRequest
+
+type Provider struct {
+	config  *ProviderConfig
+	eid     int64
+	leaseId int64
+	ctx     context.Context
+	cancel  context.CancelFunc
+
+	discoverClient providerpb.ProviderServiceClient
+}
+
+func (p *Provider) initializeProvider(configPath string) error {
+	// 读配置
+	configBytes, err := os.ReadFile(configPath)
+	if err != nil {
+		return util.ErrorWithPos(err)
+	}
+	config := &ProviderConfig{}
+	err = yaml.Unmarshal(configBytes, &config)
+	if err != nil {
+		return util.ErrorWithPos(err)
+	}
+	p.config = config
+	// 获取ip
+	ip, err := common.GetIpAddr()
+	if err != nil {
+		return util.ErrorWithPos(err)
+	}
+	p.config.Ip = ip
+
+	p.ctx, p.cancel = context.WithCancel(context.Background())
+	if err := p.grpcConnect(); err != nil {
+		return util.ErrorWithPos(err)
+	}
+	return nil
+}
+
+func (p *Provider) grpcConnect() error {
+	conn, err := grpc.NewClient(healthCheckAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return util.ErrorWithPos(err)
+	}
+	p.discoverClient = providerpb.NewProviderServiceClient(conn)
+	return nil
+}
 
 func (p *Provider) register() error {
 	resp, err := p.discoverClient.Register(p.ctx, (*providerpb.RegisterRequest)(p.config))
@@ -70,6 +127,12 @@ func (p *Provider) unregister() error {
 	}
 	return nil
 }
+
+// const (
+// 	RegisterPath   = "/provider/register"
+// 	HeartbeatPath  = "/provider/heartbeat"
+// 	UnregisterPath = "/provider/unregister"
+// )
 
 // func (p *Provider) unregister() {
 // 	identity := &providerpb.HeartbeatRequest{
