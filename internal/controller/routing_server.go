@@ -7,7 +7,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"git.woa.com/kefuai/mini-router/internal/common"
 	"git.woa.com/kefuai/mini-router/pkg/proto/consumerpb"
 	"git.woa.com/kefuai/mini-router/pkg/proto/routingpb"
 	"git.woa.com/mfcn/ms-go/pkg/mlog"
@@ -15,28 +14,30 @@ import (
 	"go.etcd.io/etcd/api/v3/mvccpb"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
 )
 
 const (
 	pullInterval = 5
 )
 
-type DiscoverServer struct {
+type RoutingServer struct {
 	etcdClient   *clientv3.Client
-	routingTable *common.RoutingTable
-	changeLogs   []*routingpb.ChangeRecords
-	mu           sync.RWMutex
-	version      atomic.Int64
+	routingTable atomic.Pointer[routingpb.RoutingTable]
+	logVersion   atomic.Int64
 	ctx          context.Context
 	cancelFunc   context.CancelFunc
 	loc          *time.Location
+	changeLogs   []*routingpb.ChangeRecords
+	mu           sync.RWMutex
 
 	consumerpb.UnimplementedConsumerServiceServer
 }
 
-func NewRoutingServer() (*DiscoverServer, error) {
-	server := &DiscoverServer{
-		changeLogs: make([]*routingpb.ChangeRecords, changeLogLength, changeLogLength),
+func NewRoutingServer(port string) (*RoutingServer, error) {
+	server := &RoutingServer{
+		changeLogs:   make([]*routingpb.ChangeRecords, changeLogLength, changeLogLength),
+		routingTable: atomic.Pointer[routingpb.RoutingTable]{},
 	}
 	client, err := clientv3.New(clientv3.Config{
 		Endpoints:   []string{etcdUri},
@@ -52,21 +53,23 @@ func NewRoutingServer() (*DiscoverServer, error) {
 	return server, nil
 }
 
-func (s *DiscoverServer) Run() {
+func (s *RoutingServer) Run() {
 	go s.watchLoop()
 	go s.pullLoop()
 }
 
-func (s *DiscoverServer) Stop() {
+func (s *RoutingServer) Stop() {
 	s.cancelFunc()
 }
 
-func (s *DiscoverServer) pullLoop() {
+func (s *RoutingServer) pullLoop() {
 	ticker := time.NewTicker(pullInterval * time.Second)
 	for {
 		select {
 		case <-ticker.C:
-
+			if err := s.updateLocalRoutingTable(); err != nil {
+				mlog.Errorf("failed to update local routing table: %v", err)
+			}
 		case <-s.ctx.Done():
 			mlog.Info("pull loop stopped")
 			return
@@ -74,7 +77,20 @@ func (s *DiscoverServer) pullLoop() {
 	}
 }
 
-func (s *DiscoverServer) watchLoop() {
+func (s *RoutingServer) updateLocalRoutingTable() error {
+	resp, err := s.etcdClient.Get(s.ctx, routingTableKey)
+	if err != nil {
+		return util.ErrorWithPos(err)
+	}
+	routingTable := &routingpb.RoutingTable{}
+	if err := json.Unmarshal(resp.Kvs[0].Value, routingTable); err != nil {
+		return util.ErrorWithPos(err)
+	}
+	s.routingTable.Store(routingTable)
+	return nil
+}
+
+func (s *RoutingServer) watchLoop() {
 	watchChan := s.etcdClient.Watch(s.ctx, routingLogPrefix, clientv3.WithPrefix())
 	for watchResp := range watchChan {
 		for _, event := range watchResp.Events {
@@ -96,31 +112,103 @@ func (s *DiscoverServer) watchLoop() {
 	}
 }
 
-func (s *DiscoverServer) updateLog(log *routingpb.ChangeRecords) {
-	currentVersion := s.version.Load()
+func (s *RoutingServer) updateLog(log *routingpb.ChangeRecords) {
 	targetVersion := log.GetVersion()
-	if currentVersion >= targetVersion || currentVersion+3 < targetVersion {
-		mlog.Fatal("log version mismatched", zap.Any("current log version", currentVersion), zap.Any("target version", targetVersion))
+	// 版本号初始化为最新version - 1
+	if s.logVersion.Load() == 0 {
+		s.logVersion.Store(targetVersion - 1)
 	}
-
+	currentVersion := s.logVersion.Load()
+	if currentVersion >= targetVersion {
+		mlog.Fatal("log version illegal", zap.Any("current log version", currentVersion), zap.Any("target version", targetVersion))
+	} else if currentVersion+3 < targetVersion {
+		s.logVersion.Store(targetVersion)
+		s.clearLog()
+		mlog.Info("log version too low, clear all log")
+	} else {
+		s.logVersion.Add(1)
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	// 对头出队
+	// 队头出队
 	s.changeLogs = s.changeLogs[1:]
 	// 队尾入队
 	s.changeLogs = append(s.changeLogs, log)
 	mlog.Info("updated log", zap.Any("log version", targetVersion), zap.Any("log", log))
 }
 
-func (s *DiscoverServer) ConsumerInit(context.Context, *consumerpb.ConsumerInitRequest) (*consumerpb.ConsumerInitReply, error) {
-	resp, err := s.etcdClient.Get(s.ctx, routingTableKey)
+func (s *RoutingServer) clearLog() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.changeLogs = make([]*routingpb.ChangeRecords, changeLogLength, changeLogLength)
+}
+
+func (s *RoutingServer) ConsumerInit(ctx context.Context, req *consumerpb.ConsumerInitRequest) (*consumerpb.ConsumerInitReply, error) {
+	group, version, err := s.getTargetRouting(ctx, req.GetGroupName(), req.GetHostName())
 	if err != nil {
-		mlog.Warnf("failed to get routing table from etcd: %v", err)
+		mlog.Errorf("failed to init consumer: %v", err)
 		return nil, util.ErrorWithPos(err)
 	}
-
-	return nil, nil
+	return &consumerpb.ConsumerInitReply{
+		Group:   group,
+		Version: version,
+	}, nil
 }
-func (s *DiscoverServer) ConsumerUpdate(context.Context, *consumerpb.ConsumerUpdateRequest) (*consumerpb.ConsumerUpdateReply, error) {
+
+func (s *RoutingServer) getTargetRouting(ctx context.Context, groupName string, hosts []string) (*routingpb.Group, int64, error) {
+	// recover
+	defer func() {
+		if err := recover(); err != nil {
+			mlog.Warnf("recovered from panic: %v", err)
+		}
+	}()
+	routingTable := s.routingTable.Load()
+	version := s.logVersion.Load()
+	group, ok := routingTable.GetGroups()[groupName]
+	if !ok {
+		return nil, 0, util.ErrorfWithPos("group [%v] not exists", groupName)
+	}
+
+	resp := &routingpb.Group{
+		Name:  groupName,
+		Hosts: make(map[string]*routingpb.Host, len(hosts)),
+	}
+
+	for _, hostName := range hosts {
+		host, ok := group.Hosts[hostName]
+		if !ok {
+			mlog.Infof("host [%v/%v] not exists", groupName, hostName)
+			continue
+		}
+		resp.Hosts[hostName] = proto.Clone(host).(*routingpb.Host)
+	}
+	return resp, version, nil
+}
+
+func (s *RoutingServer) ConsumerUpdate(ctx context.Context, req *consumerpb.ConsumerUpdateRequest) (*consumerpb.ConsumerUpdateReply, error) {
+	dif := s.logVersion.Load() - req.GetVersion()
+	// consumer版本号过低，直接发全量的新表
+	if dif > 2 || req.GetVersion() == 0 {
+		mlog.Info("consumer version too low, dispatch all routing table")
+		group, version, err := s.getTargetRouting(ctx, req.GetGroupName(), req.GetHostName())
+		if err != nil {
+			mlog.Errorf("failed to return init routing table: %v", err)
+			return nil, util.ErrorWithPos(err)
+		}
+		return &consumerpb.ConsumerUpdateReply{
+			Version:  version,
+			Outdated: true,
+			Group:    group,
+		}, nil
+	} else if dif < 0 {
+		mlog.Fatal("routing server version too low")
+	}
+
+	// resp := &consumerpb.ConsumerUpdateReply{}
+	// s.mu.RLock()
+	// for i := int64(0); i < dif; i++ {
+
+	// }
+
 	return nil, nil
 }

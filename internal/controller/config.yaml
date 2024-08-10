@@ -1,5 +1,0 @@
-constroller-cluster-ips:
-  - ip: 127.0.0.1
-    last-heartbeat: 1
-  - ip: 127.0.0.2
-    last-heartbeat: 2
