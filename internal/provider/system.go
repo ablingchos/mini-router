@@ -98,9 +98,9 @@ func (p *Provider) controlLoop() {
 			}
 		}
 	case <-p.ctx.Done():
-		mlog.Info("received stop signal, start to unregister")
+		mlog.Info("control loop stopped")
 		go p.unregister()
-		break
+		return
 	}
 }
 

@@ -61,6 +61,7 @@ func (c *Consumer) initializeConsumer(configPath string) error {
 
 func (c *Consumer) watchLoop() {
 	ticker := time.NewTicker(pullInterval * time.Second)
+	mlog.Debug("start to run watch loop")
 	for {
 		select {
 		case <-ticker.C:

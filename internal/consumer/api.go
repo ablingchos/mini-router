@@ -29,7 +29,7 @@ func (c *Consumer) Init() error {
 		return util.ErrorWithPos(err)
 	}
 	c.coverRoutingTable(resp.GetGroup(), resp.GetVersion())
-
+	go c.watchLoop()
 	return nil
 }
 

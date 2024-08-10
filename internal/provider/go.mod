@@ -5,7 +5,8 @@ go 1.21.1
 require (
 	git.woa.com/kefuai/mini-router v0.0.0-20240809105507-af7275fbbec3
 	git.woa.com/mfcn/ms-go v0.4.74
-	gopkg.in/yaml.v3 v3.0.1
+	google.golang.org/grpc v1.65.0
+	gopkg.in/yaml.v2 v2.4.0
 )
 
 require (
@@ -18,6 +19,7 @@ require (
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.55.0 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
+	github.com/samber/lo v1.46.0 // indirect
 	github.com/stretchr/testify v1.9.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
@@ -25,7 +27,6 @@ require (
 	golang.org/x/sys v0.23.0 // indirect
 	golang.org/x/text v0.16.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240528184218-531527333157 // indirect
-	google.golang.org/grpc v1.65.0 // indirect
 	google.golang.org/protobuf v1.34.2 // indirect
-	gopkg.in/yaml.v2 v2.4.0 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
