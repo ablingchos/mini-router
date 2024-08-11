@@ -1,5 +1,3 @@
-git.woa.com/kefuai/mini-router v0.0.0-20240809105507-af7275fbbec3 h1:yWIarGT+k5V3TaM0QrC3aapRE8d7RlBd3X99+LKhg24=
-git.woa.com/kefuai/mini-router v0.0.0-20240809105507-af7275fbbec3/go.mod h1:PWPESs6ZH9JFu/UxR3zgrHRS6xUgdpMj7Img8JYakNU=
 git.woa.com/kefuai/mini-router/pkg v0.1.0 h1:AC1xcW+hlHN1Uk/S2+3mVZYpFhKvxJhBQbJTLmI1qUE=
 git.woa.com/kefuai/mini-router/pkg v0.1.0/go.mod h1:glQuvT5c0EU7iAe9bow7/8n1/+s1my22e8WXVBchuzc=
 git.woa.com/mfcn/ms-go v0.4.74 h1:crWPRhOATg5hrWtx4FcWRIqzOScbTcnnpuJxjOKSjNM=

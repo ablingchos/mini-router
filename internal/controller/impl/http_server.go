@@ -17,7 +17,6 @@ const (
 	// for etcd
 	httpGatewayKey  = "/controller/httpserver/addr"
 	serverKeyPrefix = "/controller/server/addr"
-	etcdUri         = "localhost:2379"
 	grpcPort        = "6000"
 	httpPort        = "28080"
 	// for http
