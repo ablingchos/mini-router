@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"git.woa.com/kefuai/mini-router/internal/common"
+	"git.woa.com/kefuai/mini-router/pkg/common"
 	"git.woa.com/kefuai/mini-router/pkg/proto/providerpb"
 	"git.woa.com/mfcn/ms-go/pkg/mlog"
 	"git.woa.com/mfcn/ms-go/pkg/util"
