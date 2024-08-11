@@ -3,7 +3,7 @@ module git.woa.com/kefuai/mini-router/provider
 go 1.21.1
 
 require (
-	git.woa.com/kefuai/mini-router v0.0.0-20240809105507-af7275fbbec3
+	git.woa.com/kefuai/mini-router/pkg v0.0.1
 	git.woa.com/mfcn/ms-go v0.4.74
 	google.golang.org/grpc v1.65.0
 	gopkg.in/yaml.v2 v2.4.0
