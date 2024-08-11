@@ -46,6 +46,12 @@ enum Match {
   exact  = 1;  // 完全匹配
 }
 
+// 用户自定义kv路由规则
+message UserRule {
+  MatchRule match_rule = 1;
+  Endpoint destination = 2;
+}
+
 message ChangeRecord {
   ChangeType type   = 1;
   string group_name = 2;

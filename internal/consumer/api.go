@@ -37,3 +37,18 @@ func (c *Consumer) Stop() {
 	c.cancel()
 	mlog.Info("received consumer stop signal, start to shutdown")
 }
+
+// 获取目标host下所有可用的endpoint
+func (c *Consumer) GetEndpoints() {
+
+}
+
+// 获取满足当前路由规则的一个endpoint
+func (c *Consumer) GetTargetEndpoints() {
+
+}
+
+// 设置路由规则
+func (c *Consumer) SetRule() {
+
+}
