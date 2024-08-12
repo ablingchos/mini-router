@@ -15,7 +15,7 @@ message Group {
 
 message Host {
   string name                    = 1;  // host名
-  MatchRule match_rule           = 2;  // 键值匹配规则
+  UserRule user_rule             = 2;  // 键值匹配规则
   LoadBalancer routing_rule      = 3;  // 标准路由规则
   map<int64, Endpoint> endpoints = 4;  // 节点表
 }
@@ -29,11 +29,17 @@ message Endpoint {
   int64 lease_id = 6;  // 租约id
 }
 
+// 用户自定义kv路由规则
+message UserRule {
+  MatchRule match_rule = 1;
+  Endpoint destination = 2;
+}
+
 enum LoadBalancer {
   random          = 0;  // 随机
   consistent_hash = 1;  // 一致性哈希
   weight          = 2;  // 权重
-  destination     = 3;  // 指定目标
+  target          = 3;  // 指定目标
 }
 
 message MatchRule {
@@ -44,12 +50,6 @@ message MatchRule {
 enum Match {
   prefix = 0;  // 前缀匹配
   exact  = 1;  // 完全匹配
-}
-
-// 用户自定义kv路由规则
-message UserRule {
-  MatchRule match_rule = 1;
-  Endpoint destination = 2;
 }
 
 message ChangeRecord {
