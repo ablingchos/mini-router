@@ -8,7 +8,7 @@ import (
 
 const (
 	configPath = "/data/home/kefuai/code_repository/mini-router/consumer/impl/config.yaml"
-	host       = "test"
+	host       = "test1"
 )
 
 func main() {

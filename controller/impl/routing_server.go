@@ -58,7 +58,7 @@ func NewRoutingServer() (*RoutingServer, error) {
 
 func (s *RoutingServer) Run() {
 	go s.serveGrpc()
-	go s.watchLoop()
+	// go s.watchLoop()
 	go s.pullLoop()
 }
 
@@ -105,6 +105,7 @@ func (s *RoutingServer) updateLocalRoutingTable() error {
 		return util.ErrorWithPos(err)
 	}
 	s.routingTable.Store(routingTable)
+	mlog.Debug("update get routing table", zap.Any("routing table", routingTable))
 	return nil
 }
 

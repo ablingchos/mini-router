@@ -79,7 +79,8 @@ func (p *Provider) register() error {
 	if err != nil {
 		return util.ErrorWithPos(err)
 	}
-	p.eid = resp.Eid
+	p.eid = resp.GetEid()
+	p.leaseId = resp.GetLeaseId()
 	// go p.serverGrpc()
 	go p.controlLoop()
 
@@ -97,24 +98,32 @@ func (p *Provider) register() error {
 
 func (p *Provider) controlLoop() {
 	ticker := time.NewTicker(time.Duration(p.config.Timeout>>1) * time.Second)
-	select {
-	case <-ticker.C:
-		err := p.heartbeat()
-		if err != nil {
-			mlog.Debugf("failed to send heartbeat, start to retry: %v", err)
-			// 重试3次
-			for i := 1; i <= 3; i++ {
-				// 每隔0.5s重试一次
-				time.Sleep(time.Second / 2)
-				if err := p.heartbeat(); err == nil {
-					break
+	for {
+		select {
+		case <-ticker.C:
+			err := p.heartbeat()
+			if err != nil {
+				mlog.Debugf("failed to send heartbeat, start to retry: %v", err)
+				// 重试3次
+				fail := true
+				for i := 1; i <= 3; i++ {
+					// 每隔0.5s重试一次
+					time.Sleep(time.Second / 2)
+					if err := p.heartbeat(); err == nil {
+						fail = false
+						break
+					}
+					if fail {
+						mlog.Fatal("failed to send heartbeat with retry")
+					}
 				}
 			}
+			mlog.Debug("sent heartbeat")
+		case <-p.ctx.Done():
+			mlog.Info("control loop stopped")
+			go p.unregister()
+			return
 		}
-	case <-p.ctx.Done():
-		mlog.Info("control loop stopped")
-		go p.unregister()
-		return
 	}
 }
 

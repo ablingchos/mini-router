@@ -1,6 +1,6 @@
 group_name: test
 host_name: test1
-port: 1001
+port: "1001"
 weight: 50
 timeout: 5
-routing_rule: random
+routing_rule: 0

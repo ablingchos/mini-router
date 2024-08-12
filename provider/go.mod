@@ -3,7 +3,7 @@ module git.woa.com/kefuai/mini-router/provider
 go 1.21.1
 
 require (
-	git.woa.com/kefuai/mini-router/pkg v0.1.3
+	git.woa.com/kefuai/mini-router/pkg v0.1.4
 	git.woa.com/mfcn/ms-go v0.4.74
 	go.uber.org/zap v1.27.0
 	google.golang.org/grpc v1.65.0
@@ -31,5 +31,3 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-replace git.woa.com/kefuai/mini-router/pkg => ../pkg

@@ -51,11 +51,13 @@ func (c *Consumer) initializeConsumer(configPath string) error {
 		return util.ErrorfWithPos("wrong length of config: %v", len(bytes))
 	}
 
+	mlog.Debug("read config", zap.Any("config", string(bytes[0])))
 	group := &routingpb.Group{}
 	if err := json.Unmarshal(bytes[0], group); err != nil {
 		return util.ErrorWithPos(err)
 	}
 	c.config.Store(group)
+	mlog.Debug("load config successfully", zap.Any("config", group))
 
 	c.ctx, c.cancel = context.WithCancel(context.Background())
 	if err := c.grpcConnect(); err != nil {

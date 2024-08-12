@@ -3,7 +3,7 @@ module git.woa.com/kefuai/mini-router/controller
 go 1.21.1
 
 require (
-	git.woa.com/kefuai/mini-router/pkg v0.1.0
+	git.woa.com/kefuai/mini-router/pkg v0.1.4
 	git.woa.com/mfcn/ms-go v0.4.74
 	go.etcd.io/etcd/api/v3 v3.5.15
 	go.etcd.io/etcd/client/v3 v3.5.15
@@ -39,5 +39,3 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-replace git.woa.com/kefuai/mini-router/pkg => ../pkg

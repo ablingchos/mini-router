@@ -97,10 +97,10 @@ func (r *RegisterServer) Run() {
 func (r *RegisterServer) Heartbeat(ctx context.Context, req *providerpb.HeartbeatRequest) (*providerpb.HeartbeatReply, error) {
 	// keep alive
 	if _, err := r.etcdClient.KeepAliveOnce(ctx, clientv3.LeaseID(req.GetLeaseId())); err != nil {
-		mlog.Errorf("failed to keep alive endpoint: [%v %v %v]", req.GetGroupName(), req.GetHostName(), req.GetEid())
+		mlog.Errorf("failed to keep alive endpoint: [%v %v %v], leaseid: %v", req.GetGroupName(), req.GetHostName(), req.GetEid(), req.GetLeaseId())
 		return nil, util.ErrorWithPos(err)
 	}
-	mlog.Infof("[%v/%v/%v] heartbeat finished", req.GetGroupName(), req.GetHostName(), req.GetEid())
+	mlog.Infof("[%v %v %v] heartbeat finished", req.GetGroupName(), req.GetHostName(), req.GetEid())
 	return &providerpb.HeartbeatReply{}, nil
 }
 
