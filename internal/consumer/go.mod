@@ -1,4 +1,4 @@
-module git.woa.com/kefuai/mini-router/provider
+module git.woa.com/kefuai/mini-router/consumer
 
 go 1.21.1
 

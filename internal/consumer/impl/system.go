@@ -8,9 +8,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"git.woa.com/kefuai/mini-router/consumer/impl/algorithm/random"
 	"git.woa.com/kefuai/mini-router/pkg/proto/consumerpb"
 	"git.woa.com/kefuai/mini-router/pkg/proto/routingpb"
-	"git.woa.com/kefuai/mini-router/provider/impl/algorithm/random"
 	"git.woa.com/mfcn/ms-go/pkg/mlog"
 	"git.woa.com/mfcn/ms-go/pkg/util"
 	"github.com/samber/lo"
