@@ -1,10 +1,10 @@
 group:
   name: test  # 路由组名称（类似namespace的概念）
   hosts:
-    host1:
-      routing_rule: random  # 标准路由规则
-    host2:
+    test1:
+      # routing_rule: random  # 标准路由规则
+    test2:
       match_rule:
         match: exact  # 匹配方式
         content: "/api/v2"  # 匹配内容
-      routing_rule: random  # 标准路由规则
+      # routing_rule: random  # 标准路由规则

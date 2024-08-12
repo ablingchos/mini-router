@@ -18,7 +18,7 @@ func NewProvider(configPath string) (*Provider, error) {
 }
 
 // 被调方注册
-func (p *Provider) Register(configPath string) error {
+func (p *Provider) Run() error {
 	return p.register()
 }
 

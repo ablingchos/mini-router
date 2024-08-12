@@ -41,11 +41,7 @@ type RoutingWatcher struct {
 }
 
 func NewRoutingWatcher() (*RoutingWatcher, error) {
-	routingWatcher := &RoutingWatcher{
-		routingTable: &common.RoutingTable{
-			Groups: make(map[string]*routingpb.Group),
-		},
-	}
+	routingWatcher := &RoutingWatcher{}
 	client, err := clientv3.New(clientv3.Config{
 		Endpoints:   []string{etcdUri},
 		DialTimeout: 5 * time.Second,
@@ -67,12 +63,28 @@ func NewRoutingWatcher() (*RoutingWatcher, error) {
 }
 
 func (r *RoutingWatcher) Run() {
+	// 在 initRoutingTable 之前调用
+	if err := r.checkEtcdHealth(); err != nil {
+		mlog.Fatalf("etcd health check failed: %v", err)
+	}
 	if err := r.initRoutingTable(); err != nil {
 		mlog.Fatalf("failed to init routing table: %v", err)
 	}
+	mlog.Debugf("init routing table successfully")
 	go r.watchLoop()
 	go r.updateLoop()
 	mlog.Info("routing watcher start to work")
+}
+
+func (r *RoutingWatcher) checkEtcdHealth() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err := r.etcdClient.Status(ctx, r.etcdClient.Endpoints()[0])
+	if err != nil {
+		return err
+	}
+	mlog.Debug("etcd health check successful")
+	return nil
 }
 
 func (r *RoutingWatcher) Stop() {
@@ -82,20 +94,20 @@ func (r *RoutingWatcher) Stop() {
 }
 
 func (r *RoutingWatcher) initRoutingTable() error {
-	ctx := context.Background()
 	// 创建一个分布式锁会话
-	session, err := concurrency.NewSession(r.etcdClient)
+	session, err := concurrency.NewSession(r.etcdClient, concurrency.WithTTL(5))
 	if err != nil {
+		mlog.Warnf("failed to create session: %v", err)
 		return util.ErrorWithPos(err)
 	}
 	// 创建一个分布式锁
 	mutex := concurrency.NewMutex(session, routingTableMutexKey)
 	// 获取锁
-	if err := mutex.Lock(ctx); err != nil {
+	if err := mutex.Lock(r.ctx); err != nil {
 		return util.ErrorWithPos(err)
 	}
 	defer func() {
-		if err := mutex.Unlock(ctx); err != nil {
+		if err := mutex.Unlock(r.ctx); err != nil {
 			mlog.Errorf("failed to release lock: %v", err)
 		}
 		if err := session.Close(); err != nil {
@@ -104,12 +116,12 @@ func (r *RoutingWatcher) initRoutingTable() error {
 	}()
 
 	// 使用事务初始化值
-	txn := r.etcdClient.Txn(ctx)
+	txn := r.etcdClient.Txn(r.ctx)
 	// 事务操作：如果键不存在，则初始化它
 	txnResp, err := txn.If(
 		clientv3.Compare(clientv3.Version(routingTableKey), "=", 0),
 	).Then(
-		clientv3.OpPut(routingTableKey, ""),
+		clientv3.OpPut(routingTableKey, ``),
 	).Else(
 		clientv3.OpGet(routingTableKey),
 	).Commit()
@@ -117,16 +129,25 @@ func (r *RoutingWatcher) initRoutingTable() error {
 		return util.ErrorWithPos(err)
 	}
 
+	r.version.Store(1)
 	if txnResp.Succeeded {
-		r.version.Store(1)
 		mlog.Infof("created routing table key for the first time")
 	} else {
-		routingTable := &routingpb.RoutingTable{}
-		if err := json.Unmarshal(txnResp.Responses[0].GetResponseRange().Kvs[0].Value, routingTable); err != nil {
-			return util.ErrorWithPos(err)
+		kv := txnResp.Responses[0].GetResponseRange().Kvs[0]
+		value := kv.Value
+		if len(value) == 0 {
+			mlog.Warn("routing table key exists but is empty")
+			r.routingTable = &common.RoutingTable{}
+		} else {
+			routingTable := &routingpb.RoutingTable{}
+			if err := json.Unmarshal(kv.Value, routingTable); err != nil {
+				mlog.Debugf("value: %v, version: %v", string(kv.Value), kv.Version)
+				return util.ErrorWithPos(err)
+			}
+			r.routingTable = (*common.RoutingTable)(routingTable)
+			r.version.Store(txnResp.Responses[0].GetResponseRange().Kvs[0].Version)
 		}
-		r.routingTable = (*common.RoutingTable)(routingTable)
-		r.version.Store(txnResp.Responses[0].GetResponseRange().Kvs[0].Version)
+
 		mlog.Info("init routing watcher", zap.Any("routing table", r.routingTable), zap.Any("version", r.version.Load()))
 	}
 
@@ -177,10 +198,10 @@ func (r *RoutingWatcher) updateLoop() {
 				mlog.Warnf("failed to update routing to etcd: %v", err)
 				break
 			}
-			if err := r.reportChangeRecordsToEtcd(); err != nil {
-				mlog.Warnf("failed to report change log to etcd: %v", err)
-				break
-			}
+			// if err := r.reportChangeRecordsToEtcd(); err != nil {
+			// 	mlog.Warnf("failed to report change log to etcd: %v", err)
+			// 	break
+			// }
 		case <-r.ctx.Done():
 			mlog.Info("received shutdown signal, update stopped")
 			return
@@ -198,7 +219,7 @@ func (r *RoutingWatcher) updateRoutingToEtcd() error {
 	version := r.version.Load()
 	txn := r.etcdClient.Txn(r.ctx)
 	txnResp, err := txn.If(
-		clientv3.Compare(clientv3.Version(routingTableKey), "<=", version),
+		clientv3.Compare(clientv3.Version(routingTableKey), "<", version+1),
 	).Then(
 		clientv3.OpPut(routingTableKey, string(bytes)),
 	).Else(
@@ -268,7 +289,7 @@ func (r *RoutingWatcher) addEndpoint(groupName string, hostName string, endpoint
 func parseHeartbeatKey(key string) (string, string, string, error) {
 	// split key
 	words := strings.Split(key, "/")
-	if len(words) != 4 || words[0] != routingHeartbeatKey {
+	if len(words) != 4 || words[0] != strings.TrimPrefix(routingHeartbeatKey, "/") {
 		return "", "", "", util.ErrorfWithPos("wrong format to add an endpoint")
 	}
 	return words[1], words[2], words[3], nil

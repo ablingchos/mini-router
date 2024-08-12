@@ -2,13 +2,14 @@ package consumer
 
 import (
 	"context"
-	"os"
+	"encoding/json"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"git.woa.com/kefuai/mini-router/consumer/impl/algorithm/random"
+	"git.woa.com/kefuai/mini-router/pkg/common"
 	"git.woa.com/kefuai/mini-router/pkg/proto/consumerpb"
 	"git.woa.com/kefuai/mini-router/pkg/proto/routingpb"
 	"git.woa.com/mfcn/ms-go/pkg/mlog"
@@ -17,7 +18,6 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"gopkg.in/yaml.v2"
 )
 
 var (
@@ -43,16 +43,19 @@ type Consumer struct {
 
 func (c *Consumer) initializeConsumer(configPath string) error {
 	// 读配置
-	configBytes, err := os.ReadFile(configPath)
+	bytes, err := common.LoadYAML(configPath)
 	if err != nil {
 		return util.ErrorWithPos(err)
 	}
-	config := &routingpb.Group{}
-	err = yaml.Unmarshal(configBytes, &config)
-	if err != nil {
+	if len(bytes) != 1 {
+		return util.ErrorfWithPos("wrong length of config: %v", len(bytes))
+	}
+
+	group := &routingpb.Group{}
+	if err := json.Unmarshal(bytes[0], group); err != nil {
 		return util.ErrorWithPos(err)
 	}
-	c.config.Store(config)
+	c.config.Store(group)
 
 	c.ctx, c.cancel = context.WithCancel(context.Background())
 	if err := c.grpcConnect(); err != nil {

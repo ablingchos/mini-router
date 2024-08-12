@@ -1,5 +1,5 @@
 package controller
 
 const (
-	etcdUri = "localhost:2379"
+	etcdUri = "http://localhost:2379"
 )

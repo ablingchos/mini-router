@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"encoding/json"
+	"net"
 	"strconv"
 	"strings"
 	"time"
@@ -14,12 +15,14 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/client/v3/concurrency"
 	"go.uber.org/zap"
+	"google.golang.org/grpc"
 )
 
 const (
 	idMutexKey          = "/mutex/id"
 	idKey               = "/id"
 	routingHeartbeatKey = "/heartbeat"
+	healthCheckPort     = ":5100"
 )
 
 type RegisterServer struct {
@@ -28,7 +31,7 @@ type RegisterServer struct {
 	providerpb.UnimplementedProviderServiceServer
 }
 
-func NewRegisterServer(port string) (*RegisterServer, error) {
+func NewRegisterServer() (*RegisterServer, error) {
 	registerServer := &RegisterServer{}
 	client, err := clientv3.New(clientv3.Config{
 		Endpoints:   []string{etcdUri},
@@ -49,7 +52,7 @@ func (r *RegisterServer) Register(ctx context.Context, req *providerpb.RegisterR
 	}
 	// 在etcd中注册的key，四段式: "/heartbeat/group1/host1/eid"
 	keys := []string{routingHeartbeatKey, req.GroupName, req.HostName, strconv.Itoa(int(eid))}
-	endpointKey := "/" + strings.Join(keys, "/")
+	endpointKey := strings.Join(keys, "/")
 	// 向etcd创建lease
 	leaseResp, err := r.etcdClient.Grant(ctx, int64(req.GetTimeout()))
 	if err != nil {
@@ -71,17 +74,30 @@ func (r *RegisterServer) Register(ctx context.Context, req *providerpb.RegisterR
 		return nil, util.ErrorWithPos(err)
 	}
 
-	mlog.Infof("[%v/%v/%v] register finished", req.GetGroupName(), req.GetHostName(), eid)
+	mlog.Infof("[%v %v %v] register finished, lease id: %v", req.GetGroupName(), req.GetHostName(), eid, leaseResp.ID)
 	return &providerpb.RegisterReply{
 		Eid:     eid,
 		LeaseId: int64(leaseResp.ID),
 	}, nil
 }
 
+func (r *RegisterServer) Run() {
+	lis, err := net.Listen("tcp", healthCheckPort)
+	if err != nil {
+		mlog.Fatalf("failed to listen port %v: %v", healthCheckPort, err)
+	}
+	s := grpc.NewServer()
+	providerpb.RegisterProviderServiceServer(s, r)
+	mlog.Infof("server listening on port: %v", lis.Addr())
+	if err := s.Serve(lis); err != nil {
+		mlog.Fatalf("failed to serve: %v", err)
+	}
+}
+
 func (r *RegisterServer) Heartbeat(ctx context.Context, req *providerpb.HeartbeatRequest) (*providerpb.HeartbeatReply, error) {
 	// keep alive
 	if _, err := r.etcdClient.KeepAliveOnce(ctx, clientv3.LeaseID(req.GetLeaseId())); err != nil {
-		mlog.Errorf("failed to keep alive endpoint: [%v/%v/%v]", req.GetGroupName(), req.GetHostName(), req.GetEid())
+		mlog.Errorf("failed to keep alive endpoint: [%v %v %v]", req.GetGroupName(), req.GetHostName(), req.GetEid())
 		return nil, util.ErrorWithPos(err)
 	}
 	mlog.Infof("[%v/%v/%v] heartbeat finished", req.GetGroupName(), req.GetHostName(), req.GetEid())

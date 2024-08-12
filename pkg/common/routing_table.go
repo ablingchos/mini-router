@@ -11,6 +11,9 @@ import (
 type RoutingTable routingpb.RoutingTable
 
 func (r *RoutingTable) Insert(groupName string, hostName string, endpoint *routingpb.Endpoint) error {
+	if r.Groups == nil {
+		r.Groups = make(map[string]*routingpb.Group)
+	}
 	// check group
 	if _, ok := r.Groups[groupName]; !ok {
 		r.Groups[groupName] = &routingpb.Group{

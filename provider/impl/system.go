@@ -2,7 +2,7 @@ package provider
 
 import (
 	"context"
-	"os"
+	"encoding/json"
 	"sync"
 	"time"
 
@@ -10,9 +10,9 @@ import (
 	"git.woa.com/kefuai/mini-router/pkg/proto/providerpb"
 	"git.woa.com/mfcn/ms-go/pkg/mlog"
 	"git.woa.com/mfcn/ms-go/pkg/util"
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"gopkg.in/yaml.v2"
 )
 
 const (
@@ -38,16 +38,19 @@ type Provider struct {
 
 func (p *Provider) initializeProvider(configPath string) error {
 	// 读配置
-	configBytes, err := os.ReadFile(configPath)
+	bytes, err := common.LoadYAML(configPath)
 	if err != nil {
 		return util.ErrorWithPos(err)
 	}
-	config := &ProviderConfig{}
-	err = yaml.Unmarshal(configBytes, &config)
-	if err != nil {
+	if len(bytes) != 1 {
+		return util.ErrorfWithPos("wrong length of config: %v", len(bytes))
+	}
+	config := &providerpb.RegisterRequest{}
+	if err := json.Unmarshal(bytes[0], config); err != nil {
 		return util.ErrorWithPos(err)
 	}
-	p.config = config
+	mlog.Debug("load config successfully", zap.Any("config", config))
+	p.config = (*ProviderConfig)(config)
 	// 获取ip
 	ip, err := common.GetIpAddr()
 	if err != nil {
@@ -77,9 +80,20 @@ func (p *Provider) register() error {
 		return util.ErrorWithPos(err)
 	}
 	p.eid = resp.Eid
+	// go p.serverGrpc()
 	go p.controlLoop()
+
 	return nil
 }
+
+// func (p *Provider) serverGrpc() {
+// 	lis, err := net.Listen("tcp", ":" + p.config.Port)
+// 	if err != nil {
+// 		mlog.Fatalf("failed to listen port %v: %v", p.config.Port, err)
+// 	}
+// 	s := grpc.NewServer()
+
+// }
 
 func (p *Provider) controlLoop() {
 	ticker := time.NewTicker(time.Duration(p.config.Timeout>>1) * time.Second)
@@ -90,8 +104,8 @@ func (p *Provider) controlLoop() {
 			mlog.Debugf("failed to send heartbeat, start to retry: %v", err)
 			// 重试3次
 			for i := 1; i <= 3; i++ {
-				// 每隔1秒重试一次
-				time.Sleep(time.Second)
+				// 每隔0.5s重试一次
+				time.Sleep(time.Second / 2)
 				if err := p.heartbeat(); err == nil {
 					break
 				}

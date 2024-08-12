@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"encoding/json"
+	"net"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -14,11 +15,13 @@ import (
 	"go.etcd.io/etcd/api/v3/mvccpb"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.uber.org/zap"
+	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 )
 
 const (
-	pullInterval = 5
+	pullInterval      = 5
+	routingServerPort = ":5200"
 )
 
 type RoutingServer struct {
@@ -34,7 +37,7 @@ type RoutingServer struct {
 	consumerpb.UnimplementedConsumerServiceServer
 }
 
-func NewRoutingServer(port string) (*RoutingServer, error) {
+func NewRoutingServer() (*RoutingServer, error) {
 	server := &RoutingServer{
 		changeLogs:   make([]*routingpb.ChangeRecords, changeLogLength, changeLogLength),
 		routingTable: atomic.Pointer[routingpb.RoutingTable]{},
@@ -54,12 +57,27 @@ func NewRoutingServer(port string) (*RoutingServer, error) {
 }
 
 func (s *RoutingServer) Run() {
+	go s.serveGrpc()
 	go s.watchLoop()
 	go s.pullLoop()
 }
 
 func (s *RoutingServer) Stop() {
 	s.cancelFunc()
+}
+
+func (s *RoutingServer) serveGrpc() {
+	lis, err := net.Listen("tcp", routingServerPort)
+	if err != nil {
+		mlog.Fatalf("failed to start grpc server: %v", err)
+	}
+
+	server := grpc.NewServer()
+	consumerpb.RegisterConsumerServiceServer(server, s)
+	mlog.Infof("server listening on port: %v", lis.Addr())
+	if err := server.Serve(lis); err != nil {
+		mlog.Fatalf("failed to serve: %v", err)
+	}
 }
 
 func (s *RoutingServer) pullLoop() {
