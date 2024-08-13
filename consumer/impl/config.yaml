@@ -1,10 +1,17 @@
 name: test  # 路由组名称（类似namespace的概念）
 hosts:
   test1:
+    routing_rule:
+      # random          = 0;  // 随机
+      # consistent_hash = 1;  // 一致性哈希
+      # weight          = 2;  // 权重
+      # target          = 3;  // 指定目标
+      lb: 3
+      target: "9.134.78.221:10002"
     # routing_rule: random  # 标准路由规则
   test2:
     user_rule:
       match_rule:
         match: 0
-        content: "/api/v2"  # 匹配内容
+        content: "eid-"  # 匹配内容
     # routing_rule: random  # 标准路由规则

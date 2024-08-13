@@ -31,10 +31,10 @@ func main() {
 		mlog.Errorf("Fail", zap.Error(err))
 	}
 	mlog.SetL(l)
-	for i := 10001; i <= 20000; i++ {
+	for i := 10001; i <= 10005; i++ {
 		time.Sleep(50 * time.Millisecond)
 		go func(i int) {
-			sdk, err := provider.NewproviderForTest(strconv.Itoa(i))
+			sdk, err := provider.NewproviderForTest(strconv.Itoa(i), int64(i))
 			if err != nil {
 				mlog.Fatalf("failed to get a new provider sdk: %v", err)
 			}

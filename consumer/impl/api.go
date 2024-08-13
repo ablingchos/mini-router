@@ -20,6 +20,8 @@ func NewConsumer(configPath string, virtualNode int) (*Consumer, error) {
 			hashRing:    atomic.Pointer[map[string]*consistenthash.HashRing]{},
 			virtualNode: virtualNode,
 		}
+		emptyMap := make(map[string]*consistenthash.HashRing)
+		consumer.hashRing.Store(&emptyMap)
 		err = consumer.initializeConsumer(configPath)
 	})
 	if err != nil {
@@ -64,7 +66,7 @@ func (c *Consumer) GetEndpoints(hostName string) ([]string, error) {
 }
 
 // 获取满足当前路由规则的一个endpoint
-func (c *Consumer) GetTargetEndpoints(hostName string, key string) (string, error) {
+func (c *Consumer) GetTargetEndpoint(hostName string, key string) (string, error) {
 	if key != "" {
 		target, err := c.getTargetByKey(hostName, key)
 		if err != nil {
@@ -82,14 +84,14 @@ func (c *Consumer) GetTargetEndpoints(hostName string, key string) (string, erro
 }
 
 // 设置路由规则
-func (c *Consumer) SetRule(hostName string, rule *routingpb.UserRule, timoeout time.Duration) error {
+func (c *Consumer) SetRule(hostName string, rule *routingpb.UserRule, timoeout time.Duration) {
 	host := &routingpb.Host{
 		Name:     hostName,
 		UserRule: rule,
 	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.routingTable.GetHosts()[hostName] = host
+	config := c.config.Load()
+	config.GetHosts()[hostName] = host
+	c.config.Store(config)
+
 	mlog.Info("set user rule successfully", zap.Any("user rule", host))
-	return nil
 }

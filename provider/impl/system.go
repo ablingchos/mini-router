@@ -36,7 +36,7 @@ type Provider struct {
 	discoverClient providerpb.ProviderServiceClient
 }
 
-func (p *Provider) initializeProviderForTest(port string) error {
+func (p *Provider) initializeProviderForTest(port string, eid int64) error {
 	config := &providerpb.RegisterRequest{
 		GroupName: "test",
 		HostName:  "test1",

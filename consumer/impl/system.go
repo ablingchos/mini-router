@@ -104,7 +104,8 @@ func (c *Consumer) coverRoutingTable(routingTable *routingpb.Group, version int6
 	defer c.mu.Unlock()
 	c.routingTable = routingTable
 	c.version = version
-	mlog.Debug("cover routing table successfully", zap.Any("routing table", routingTable), zap.Any("version", version))
+	go c.updatehashRing()
+	// mlog.Debug("cover routing table successfully", zap.Any("routing table", routingTable), zap.Any("version", version))
 }
 
 // TODO: 增量更新
@@ -115,15 +116,16 @@ func (c *Consumer) processRoutingTable(log *routingpb.ChangeRecords, version int
 // 全量更新哈希环
 func (c *Consumer) updatehashRing() {
 	hashRing := make(map[string]*consistenthash.HashRing)
+	config := c.config.Load()
 
 	c.mu.RLock()
-	for _, host := range c.routingTable.GetHosts() {
+	for name, host := range config.GetHosts() {
 		hostRing := consistenthash.NewHashRing(c.virtualNode)
 		if host.GetRoutingRule().GetLb() == routingpb.LoadBalancer_consistent_hash {
-			for _, endpoint := range host.GetEndpoints() {
+			for _, endpoint := range c.routingTable.GetHosts()[name].GetEndpoints() {
 				hostRing.AddNode(combineAddr(endpoint.GetIp(), endpoint.GetPort()))
 			}
-			hashRing[host.GetName()] = hostRing
+			hashRing[name] = hostRing
 		}
 	}
 	c.mu.RUnlock()
@@ -131,12 +133,15 @@ func (c *Consumer) updatehashRing() {
 	c.hashRing.Store(&hashRing)
 }
 
-func (c *Consumer) consistenthashRouting(hostName string, key string, target string) string {
-	ring := *c.hashRing.Load()
+func (c *Consumer) consistenthashRouting(hostName string, key string, target string) (string, error) {
+	ring := *(c.hashRing.Load())
 	if _, ok := ring[hostName]; !ok {
-		return ""
+		return "", util.ErrorfWithPos("no such host")
 	}
-	return ring[hostName].GetNode(strings.TrimPrefix(key, target))
+	if !strings.HasPrefix(key, target) {
+		return "", util.ErrorfWithPos("wrong prefix, need: %v, actual: %v", target, key)
+	}
+	return ring[hostName].GetNode(strings.TrimPrefix(key, target)), nil
 }
 
 func (c *Consumer) updateRoutingTable() {
@@ -151,7 +156,7 @@ func (c *Consumer) updateRoutingTable() {
 		return
 	}
 	if resp.Outdated {
-		mlog.Infof("routing table outdated, start to cover old version")
+		// mlog.Debugf("routing table outdated, start to cover old version")
 		c.coverRoutingTable(resp.GetGroup(), resp.GetVersion())
 	} else {
 		c.processRoutingTable(resp.GetChanges(), resp.GetVersion())
@@ -166,7 +171,7 @@ func (c *Consumer) getTargetByKey(hostName string, key string) (string, error) {
 	host := routing.GetHosts()[hostName]
 
 	if host.GetRoutingRule().GetLb() == routingpb.LoadBalancer_consistent_hash {
-		return c.consistenthashRouting(hostName, key, host.GetRoutingRule().GetTarget()), nil
+		return c.consistenthashRouting(hostName, key, host.GetRoutingRule().GetTarget())
 	}
 
 	strategy := host.GetUserRule()

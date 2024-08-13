@@ -18,9 +18,9 @@ func NewProvider(configPath string) (*Provider, error) {
 	return provider, nil
 }
 
-func NewproviderForTest(port string) (*Provider, error) {
+func NewproviderForTest(port string, eid int64) (*Provider, error) {
 	p := &Provider{}
-	if err := p.initializeProviderForTest(port); err != nil {
+	if err := p.initializeProviderForTest(port, eid); err != nil {
 		mlog.Fatalf("failed to initial provider: %v", err)
 	}
 	return p, nil

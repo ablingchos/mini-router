@@ -24,6 +24,7 @@ message RegisterRequest {
   int64 timeout             = 6;  // 心跳超时时间
   MatchRule match_rule      = 7;  // 键值匹配规则
   LoadBalancer routing_rule = 8;  // 标准路由规则
+  int64 eid                 = 9;  // 测试用，自定义eid
 }
 
 message RegisterReply {
