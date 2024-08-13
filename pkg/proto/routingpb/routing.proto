@@ -16,7 +16,7 @@ message Group {
 message Host {
   string name                    = 1;  // host名
   UserRule user_rule             = 2;  // 键值匹配规则
-  LoadBalancer routing_rule      = 3;  // 标准路由规则
+  RoutingRule routing_rule      = 3;  // 标准路由规则
   map<int64, Endpoint> endpoints = 4;  // 节点表
 }
 
@@ -33,6 +33,12 @@ message Endpoint {
 message UserRule {
   MatchRule match_rule = 1;
   Endpoint destination = 2;
+}
+
+// 标准路由规则
+message RoutingRule {
+  LoadBalancer lb = 1;
+  string target = 2;
 }
 
 enum LoadBalancer {

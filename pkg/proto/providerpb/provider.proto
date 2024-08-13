@@ -3,10 +3,16 @@ syntax = "proto3";
 package providerpb;
 option go_package = "git.woa.com/kefuai/mini-router/pkg/proto/providerpb";
 
+import "google/protobuf/any.proto";
+
 service ProviderService {
   rpc Register(RegisterRequest) returns (RegisterReply);
   rpc Heartbeat(HeartbeatRequest) returns (HeartbeatReply);
   rpc Unregister(UnregisterRequest) returns (UnregisterReply);
+}
+
+service ConsumerService {
+  rpc Communicate(CommunicateRequest) returns (CommunicateReply);
 }
 
 message RegisterRequest {
@@ -59,3 +65,23 @@ message UnregisterRequest {
 }
 
 message UnregisterReply {}
+
+message CommunicateRequest {
+  Protocol protocol            = 1;
+  Header header                = 2;
+  google.protobuf.Any req_body = 3;
+}
+
+message CommunicateReply {
+  google.protobuf.Any resp_body = 1;
+}
+
+enum Protocol {
+  grpc = 0;
+  http = 1;
+}
+
+message Header {
+  string name  = 1;
+  string value = 2;
+}

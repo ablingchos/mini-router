@@ -1,8 +1,10 @@
 package consumer
 
 import (
+	"sync/atomic"
 	"time"
 
+	consistenthash "git.woa.com/kefuai/mini-router/consumer/impl/algorithm/hash"
 	"git.woa.com/kefuai/mini-router/pkg/proto/consumerpb"
 	"git.woa.com/kefuai/mini-router/pkg/proto/routingpb"
 	"git.woa.com/mfcn/ms-go/pkg/mlog"
@@ -11,10 +13,13 @@ import (
 	"go.uber.org/zap"
 )
 
-func NewConsumer(configPath string) (*Consumer, error) {
+func NewConsumer(configPath string, virtualNode int) (*Consumer, error) {
 	var err error
 	once.Do(func() {
-		consumer = &Consumer{}
+		consumer = &Consumer{
+			hashRing:    atomic.Pointer[map[string]*consistenthash.HashRing]{},
+			virtualNode: virtualNode,
+		}
 		err = consumer.initializeConsumer(configPath)
 	})
 	if err != nil {
@@ -59,14 +64,15 @@ func (c *Consumer) GetEndpoints(hostName string) ([]string, error) {
 }
 
 // 获取满足当前路由规则的一个endpoint
-func (c *Consumer) GetTargetEndpoints(hostName string, tag string) (string, error) {
-	if tag != "" {
-		target, err := c.getTargetByTag(hostName, tag)
+func (c *Consumer) GetTargetEndpoints(hostName string, key string) (string, error) {
+	if key == "" {
+		target, err := c.getTargetByKey(hostName, key)
 		if err != nil {
 			return "", util.ErrorWithPos(err)
 		}
 		return target, nil
 	}
+
 	target, err := c.getTargetByConfig(hostName)
 	if err != nil {
 		return "", util.ErrorWithPos(err)

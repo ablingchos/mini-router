@@ -3,7 +3,7 @@ module git.woa.com/kefuai/mini-router/consumer
 go 1.21.1
 
 require (
-	git.woa.com/kefuai/mini-router/pkg v0.1.3
+	git.woa.com/kefuai/mini-router/pkg v0.0.0
 	git.woa.com/mfcn/ms-go v0.4.74
 	github.com/samber/lo v1.46.0
 	go.uber.org/zap v1.27.0

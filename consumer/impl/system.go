@@ -8,7 +8,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	consistenthash "git.woa.com/kefuai/mini-router/consumer/impl/algorithm/hash"
 	"git.woa.com/kefuai/mini-router/consumer/impl/algorithm/random"
+	"git.woa.com/kefuai/mini-router/consumer/impl/algorithm/weight"
 	"git.woa.com/kefuai/mini-router/pkg/common"
 	"git.woa.com/kefuai/mini-router/pkg/proto/consumerpb"
 	"git.woa.com/kefuai/mini-router/pkg/proto/routingpb"
@@ -37,6 +39,9 @@ type Consumer struct {
 	routingTable *routingpb.Group
 	mu           sync.RWMutex
 	version      int64
+	virtualNode  int
+
+	hashRing atomic.Pointer[map[string]*consistenthash.HashRing]
 
 	discoverClient consumerpb.ConsumerServiceClient
 }
@@ -107,6 +112,33 @@ func (c *Consumer) processRoutingTable(log *routingpb.ChangeRecords, version int
 
 }
 
+// 全量更新哈希环
+func (c *Consumer) updatehashRing() {
+	hashRing := make(map[string]*consistenthash.HashRing)
+
+	c.mu.RLock()
+	for _, host := range c.routingTable.GetHosts() {
+		hostRing := consistenthash.NewHashRing(c.virtualNode)
+		if host.GetRoutingRule().GetLb() == routingpb.LoadBalancer_consistent_hash {
+			for _, endpoint := range host.GetEndpoints() {
+				hostRing.AddNode(combineAddr(endpoint.GetIp(), endpoint.GetPort()))
+			}
+			hashRing[host.GetName()] = hostRing
+		}
+	}
+	c.mu.RUnlock()
+
+	c.hashRing.Store(&hashRing)
+}
+
+func (c *Consumer) consistenthashRouting(hostName string, key string, target string) string {
+	ring := *c.hashRing.Load()
+	if _, ok := ring[hostName]; !ok {
+		return ""
+	}
+	return ring[hostName].GetNode(strings.TrimPrefix(key, target))
+}
+
 func (c *Consumer) updateRoutingTable() {
 	config := c.getConfig()
 	resp, err := c.discoverClient.ConsumerUpdate(c.ctx, &consumerpb.ConsumerUpdateRequest{
@@ -126,25 +158,29 @@ func (c *Consumer) updateRoutingTable() {
 	}
 }
 
-func (c *Consumer) getTargetByTag(hostName string, tag string) (string, error) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	if _, ok := c.routingTable.GetHosts()[hostName]; !ok {
+func (c *Consumer) getTargetByKey(hostName string, key string) (string, error) {
+	routing := c.config.Load()
+	if _, ok := routing.GetHosts()[hostName]; !ok {
 		return "", util.ErrorfWithPos("no such host [%v] in routing table", hostName)
 	}
+	host := routing.GetHosts()[hostName]
 
-	strategy := c.routingTable.GetHosts()[hostName].GetUserRule()
+	if host.GetRoutingRule().GetLb() == routingpb.LoadBalancer_consistent_hash {
+		return c.consistenthashRouting(hostName, key, host.GetRoutingRule().GetTarget()), nil
+	}
+
+	strategy := host.GetUserRule()
 	switch strategy.GetMatchRule().GetMatch() {
 	case routingpb.Match_prefix:
-		if strings.HasPrefix(tag, strategy.GetMatchRule().GetContent()) {
+		if strings.HasPrefix(key, strategy.GetMatchRule().GetContent()) {
 			return combineAddr(strategy.GetDestination().GetIp(), strategy.GetDestination().GetPort()), nil
 		}
 	case routingpb.Match_exact:
-		if tag == strategy.GetMatchRule().GetContent() {
+		if key == strategy.GetMatchRule().GetContent() {
 			return combineAddr(strategy.GetDestination().GetIp(), strategy.GetDestination().GetPort()), nil
 		}
 	}
-	return "", util.ErrorfWithPos("no match rules, expect: %v, actual: %v", strategy, tag)
+	return "", util.ErrorfWithPos("no match rules, expect: %v, actual: %v", strategy, key)
 }
 
 func (c *Consumer) getTargetByConfig(hostName string) (string, error) {
@@ -155,22 +191,34 @@ func (c *Consumer) getTargetByConfig(hostName string) (string, error) {
 	host := routing.GetHosts()[hostName]
 
 	var targetAddr string
-	switch host.GetRoutingRule() {
-	case routingpb.LoadBalancer_consistent_hash:
+	switch host.GetRoutingRule().GetLb() {
 	case routingpb.LoadBalancer_random:
 		targetAddr = c.randomRouting(lo.MapToSlice(host.GetEndpoints(), func(eid int64, endpoint *routingpb.Endpoint) string {
 			return combineAddr(endpoint.GetIp(), endpoint.GetIp())
 		}))
 	case routingpb.LoadBalancer_weight:
+		targetAddr = c.weightRouting(lo.MapToSlice(host.GetEndpoints(), func(eid int64, endpoint *routingpb.Endpoint) *routingpb.Endpoint {
+			return endpoint
+		}))
 	case routingpb.LoadBalancer_target:
+		targetAddr = host.GetRoutingRule().GetTarget()
 	}
 
 	return targetAddr, nil
 }
 
-func (c *Consumer) randomRouting(endpoints []string) string {
-	index := random.Intn(len(endpoints))
-	return endpoints[index]
+func (c *Consumer) randomRouting(addrs []string) string {
+	index := random.Intn(len(addrs))
+	return addrs[index]
+}
+
+func (c *Consumer) weightRouting(endpoints []*routingpb.Endpoint) string {
+	weightSlice := lo.Map(endpoints, func(item *routingpb.Endpoint, index int) int64 {
+		return item.GetWeight()
+	})
+	index := weight.GetEndpoint(weightSlice)
+	endpoint := endpoints[index]
+	return combineAddr(endpoint.GetIp(), endpoint.GetPort())
 }
 
 func combineAddr(ip string, port string) string {

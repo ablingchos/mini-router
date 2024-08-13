@@ -175,3 +175,89 @@ var ProviderService_ServiceDesc = grpc.ServiceDesc{
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "pkg/proto/providerpb/provider.proto",
 }
+
+// ConsumerServiceClient is the client API for ConsumerService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+type ConsumerServiceClient interface {
+	Communicate(ctx context.Context, in *CommunicateRequest, opts ...grpc.CallOption) (*CommunicateReply, error)
+}
+
+type consumerServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewConsumerServiceClient(cc grpc.ClientConnInterface) ConsumerServiceClient {
+	return &consumerServiceClient{cc}
+}
+
+func (c *consumerServiceClient) Communicate(ctx context.Context, in *CommunicateRequest, opts ...grpc.CallOption) (*CommunicateReply, error) {
+	out := new(CommunicateReply)
+	err := c.cc.Invoke(ctx, "/providerpb.ConsumerService/Communicate", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ConsumerServiceServer is the server API for ConsumerService service.
+// All implementations must embed UnimplementedConsumerServiceServer
+// for forward compatibility
+type ConsumerServiceServer interface {
+	Communicate(context.Context, *CommunicateRequest) (*CommunicateReply, error)
+	mustEmbedUnimplementedConsumerServiceServer()
+}
+
+// UnimplementedConsumerServiceServer must be embedded to have forward compatible implementations.
+type UnimplementedConsumerServiceServer struct {
+}
+
+func (UnimplementedConsumerServiceServer) Communicate(context.Context, *CommunicateRequest) (*CommunicateReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Communicate not implemented")
+}
+func (UnimplementedConsumerServiceServer) mustEmbedUnimplementedConsumerServiceServer() {}
+
+// UnsafeConsumerServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to ConsumerServiceServer will
+// result in compilation errors.
+type UnsafeConsumerServiceServer interface {
+	mustEmbedUnimplementedConsumerServiceServer()
+}
+
+func RegisterConsumerServiceServer(s grpc.ServiceRegistrar, srv ConsumerServiceServer) {
+	s.RegisterService(&ConsumerService_ServiceDesc, srv)
+}
+
+func _ConsumerService_Communicate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CommunicateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConsumerServiceServer).Communicate(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/providerpb.ConsumerService/Communicate",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConsumerServiceServer).Communicate(ctx, req.(*CommunicateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// ConsumerService_ServiceDesc is the grpc.ServiceDesc for ConsumerService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var ConsumerService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "providerpb.ConsumerService",
+	HandlerType: (*ConsumerServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "Communicate",
+			Handler:    _ConsumerService_Communicate_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "pkg/proto/providerpb/provider.proto",
+}

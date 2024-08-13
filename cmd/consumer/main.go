@@ -7,12 +7,13 @@ import (
 )
 
 const (
-	configPath = "/data/home/kefuai/code_repository/mini-router/consumer/impl/config.yaml"
-	host       = "test1"
+	configPath  = "/data/home/kefuai/code_repository/mini-router/consumer/impl/config.yaml"
+	host        = "test1"
+	virtualNode = 3
 )
 
 func main() {
-	sdk, err := consumer.NewConsumer(configPath)
+	sdk, err := consumer.NewConsumer(configPath, virtualNode)
 	if err != nil {
 		mlog.Errorf("failed to get a new consumer sdk: %v", err)
 		return

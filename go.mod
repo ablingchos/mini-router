@@ -3,7 +3,7 @@ module git.woa.com/kefuai/mini-router
 go 1.21.1
 
 require (
-	git.woa.com/kefuai/mini-router/consumer v0.1.0
+	git.woa.com/kefuai/mini-router/consumer v0.0.0-00010101000000-000000000000
 	git.woa.com/kefuai/mini-router/controller v0.0.0-00010101000000-000000000000
 	git.woa.com/kefuai/mini-router/provider v0.0.0-00010101000000-000000000000
 	git.woa.com/mfcn/ms-go v0.4.74
@@ -48,3 +48,5 @@ replace git.woa.com/kefuai/mini-router/consumer => ./consumer
 replace git.woa.com/kefuai/mini-router/provider => ./provider
 
 replace git.woa.com/kefuai/mini-router/controller => ./controller
+
+replace git.woa.com/kefuai/mini-router/pkg => ./pkg

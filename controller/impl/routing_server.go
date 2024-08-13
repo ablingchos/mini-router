@@ -105,7 +105,7 @@ func (s *RoutingServer) updateLocalRoutingTable() error {
 		return util.ErrorWithPos(err)
 	}
 	s.routingTable.Store(routingTable)
-	mlog.Debug("update get routing table", zap.Any("routing table", routingTable))
+	mlog.Debug("update routing table", zap.Any("routing table", routingTable))
 	return nil
 }
 
