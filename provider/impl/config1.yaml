@@ -1,7 +1,10 @@
+# group_name: test
+# host_name: test1
+# port: "1001"
+# weight: 50
+# timeout: 5
 group_name: test
-host_name: test1
+host_name: test2
 port: "1001"
 weight: 50
 timeout: 5
-routing_rule:
-  lb: 0

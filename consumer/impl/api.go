@@ -65,7 +65,7 @@ func (c *Consumer) GetEndpoints(hostName string) ([]string, error) {
 
 // 获取满足当前路由规则的一个endpoint
 func (c *Consumer) GetTargetEndpoints(hostName string, key string) (string, error) {
-	if key == "" {
+	if key != "" {
 		target, err := c.getTargetByKey(hostName, key)
 		if err != nil {
 			return "", util.ErrorWithPos(err)

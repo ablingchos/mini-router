@@ -2,6 +2,7 @@ version: '3'
 services:
   etcd:
     image: quay.io/coreos/etcd
+    container_name: etcd
     ports:
       - "2379:2379"
       - "2380:2380"
@@ -16,3 +17,4 @@ services:
       --initial-cluster etcd0=http://0.0.0.0:2380
       --initial-cluster-token etcd-cluster-1
       --initial-cluster-state new
+      --max-request-bytes=10485760

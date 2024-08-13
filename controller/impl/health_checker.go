@@ -47,7 +47,7 @@ func NewRegisterServer() (*RegisterServer, error) {
 func (r *RegisterServer) Register(ctx context.Context, req *providerpb.RegisterRequest) (*providerpb.RegisterReply, error) {
 	eid, err := r.generateEid(ctx)
 	if err != nil {
-		mlog.Errorf("failed to generate new gid: %v", err)
+		mlog.Errorf("failed to generate new eid: %v", err)
 		return nil, util.ErrorWithPos(err)
 	}
 	// 在etcd中注册的key，四段式: "/heartbeat/group1/host1/eid"
@@ -100,7 +100,7 @@ func (r *RegisterServer) Heartbeat(ctx context.Context, req *providerpb.Heartbea
 		mlog.Errorf("failed to keep alive endpoint: [%v %v %v], leaseid: %v", req.GetGroupName(), req.GetHostName(), req.GetEid(), req.GetLeaseId())
 		return nil, util.ErrorWithPos(err)
 	}
-	mlog.Infof("[%v %v %v] heartbeat finished", req.GetGroupName(), req.GetHostName(), req.GetEid())
+	mlog.Debugf("[%v %v %v] heartbeat finished", req.GetGroupName(), req.GetHostName(), req.GetEid())
 	return &providerpb.HeartbeatReply{}, nil
 }
 

@@ -11,7 +11,7 @@ require (
 )
 
 require (
-	git.woa.com/kefuai/mini-router/pkg v0.1.4 // indirect
+	git.woa.com/kefuai/mini-router/pkg v0.1.5 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/coreos/go-semver v0.3.0 // indirect
@@ -48,5 +48,3 @@ replace git.woa.com/kefuai/mini-router/consumer => ./consumer
 replace git.woa.com/kefuai/mini-router/provider => ./provider
 
 replace git.woa.com/kefuai/mini-router/controller => ./controller
-
-replace git.woa.com/kefuai/mini-router/pkg => ./pkg

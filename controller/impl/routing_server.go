@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	pullInterval      = 5
+	pullInterval      = 3
 	routingServerPort = ":5200"
 )
 
@@ -101,6 +101,9 @@ func (s *RoutingServer) updateLocalRoutingTable() error {
 		return util.ErrorWithPos(err)
 	}
 	routingTable := &routingpb.RoutingTable{}
+	if len(resp.Kvs) == 0 {
+		return util.ErrorfWithPos("routing table on etcd is nil")
+	}
 	if err := json.Unmarshal(resp.Kvs[0].Value, routingTable); err != nil {
 		return util.ErrorWithPos(err)
 	}

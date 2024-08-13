@@ -41,7 +41,9 @@ type RoutingWatcher struct {
 }
 
 func NewRoutingWatcher() (*RoutingWatcher, error) {
-	routingWatcher := &RoutingWatcher{}
+	routingWatcher := &RoutingWatcher{
+		routingTable: &common.RoutingTable{},
+	}
 	client, err := clientv3.New(clientv3.Config{
 		Endpoints:   []string{etcdUri},
 		DialTimeout: 5 * time.Second,
@@ -223,7 +225,8 @@ func (r *RoutingWatcher) updateRoutingToEtcd() error {
 	).Then(
 		clientv3.OpPut(routingTableKey, string(bytes)),
 	).Else(
-		clientv3.OpGet(routingTableKey),
+		// clientv3.OpGet(routingTableKey),
+		clientv3.OpPut(routingTableKey, string(bytes)),
 	).Commit()
 	if err != nil {
 		return util.ErrorWithPos(err)

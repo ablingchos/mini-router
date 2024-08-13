@@ -36,6 +36,29 @@ type Provider struct {
 	discoverClient providerpb.ProviderServiceClient
 }
 
+func (p *Provider) initializeProviderForTest(port string) error {
+	config := &providerpb.RegisterRequest{
+		GroupName: "test",
+		HostName:  "test1",
+		Port:      port,
+		Weight:    10,
+		Timeout:   5,
+	}
+	p.config = (*ProviderConfig)(config)
+	// 获取ip
+	ip, err := common.GetIpAddr()
+	if err != nil {
+		return util.ErrorWithPos(err)
+	}
+	p.config.Ip = ip
+
+	p.ctx, p.cancel = context.WithCancel(context.Background())
+	if err := p.grpcConnect(); err != nil {
+		return util.ErrorWithPos(err)
+	}
+	return nil
+}
+
 func (p *Provider) initializeProvider(configPath string) error {
 	// 读配置
 	bytes, err := common.LoadYAML(configPath)

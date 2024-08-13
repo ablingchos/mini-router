@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"git.woa.com/mfcn/ms-go/pkg/mlog"
 	"git.woa.com/mfcn/ms-go/pkg/util"
 )
 
@@ -15,6 +16,14 @@ func NewProvider(configPath string) (*Provider, error) {
 		return nil, util.ErrorWithPos(err)
 	}
 	return provider, nil
+}
+
+func NewproviderForTest(port string) (*Provider, error) {
+	p := &Provider{}
+	if err := p.initializeProviderForTest(port); err != nil {
+		mlog.Fatalf("failed to initial provider: %v", err)
+	}
+	return p, nil
 }
 
 // 被调方注册

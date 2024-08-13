@@ -3,13 +3,13 @@ package consumer
 import (
 	"context"
 	"encoding/json"
+	"math/rand"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	consistenthash "git.woa.com/kefuai/mini-router/consumer/impl/algorithm/hash"
-	"git.woa.com/kefuai/mini-router/consumer/impl/algorithm/random"
 	"git.woa.com/kefuai/mini-router/consumer/impl/algorithm/weight"
 	"git.woa.com/kefuai/mini-router/pkg/common"
 	"git.woa.com/kefuai/mini-router/pkg/proto/consumerpb"
@@ -104,7 +104,7 @@ func (c *Consumer) coverRoutingTable(routingTable *routingpb.Group, version int6
 	defer c.mu.Unlock()
 	c.routingTable = routingTable
 	c.version = version
-	mlog.Info("cover routing table successfully", zap.Any("routing table", routingTable), zap.Any("version", version))
+	mlog.Debug("cover routing table successfully", zap.Any("routing table", routingTable), zap.Any("version", version))
 }
 
 // TODO: 增量更新
@@ -186,29 +186,35 @@ func (c *Consumer) getTargetByKey(hostName string, key string) (string, error) {
 func (c *Consumer) getTargetByConfig(hostName string) (string, error) {
 	routing := c.config.Load()
 	if _, ok := routing.GetHosts()[hostName]; !ok {
+		return "", util.ErrorfWithPos("no such host [%v] in routing config", hostName)
+	}
+	hostConfig := routing.GetHosts()[hostName]
+
+	c.mu.RLock()
+	if _, ok := c.routingTable.GetHosts()[hostName]; !ok {
 		return "", util.ErrorfWithPos("no such host [%v] in routing table", hostName)
 	}
-	host := routing.GetHosts()[hostName]
-
+	hostRouting := c.routingTable.GetHosts()[hostName]
+	defer c.mu.RUnlock()
 	var targetAddr string
-	switch host.GetRoutingRule().GetLb() {
+	switch hostConfig.GetRoutingRule().GetLb() {
 	case routingpb.LoadBalancer_random:
-		targetAddr = c.randomRouting(lo.MapToSlice(host.GetEndpoints(), func(eid int64, endpoint *routingpb.Endpoint) string {
-			return combineAddr(endpoint.GetIp(), endpoint.GetIp())
+		targetAddr = c.randomRouting(lo.MapToSlice(hostRouting.GetEndpoints(), func(eid int64, endpoint *routingpb.Endpoint) string {
+			return combineAddr(endpoint.GetIp(), endpoint.GetPort())
 		}))
 	case routingpb.LoadBalancer_weight:
-		targetAddr = c.weightRouting(lo.MapToSlice(host.GetEndpoints(), func(eid int64, endpoint *routingpb.Endpoint) *routingpb.Endpoint {
+		targetAddr = c.weightRouting(lo.MapToSlice(hostRouting.GetEndpoints(), func(eid int64, endpoint *routingpb.Endpoint) *routingpb.Endpoint {
 			return endpoint
 		}))
 	case routingpb.LoadBalancer_target:
-		targetAddr = host.GetRoutingRule().GetTarget()
+		targetAddr = hostConfig.GetRoutingRule().GetTarget()
 	}
 
 	return targetAddr, nil
 }
 
 func (c *Consumer) randomRouting(addrs []string) string {
-	index := random.Intn(len(addrs))
+	index := rand.Intn(len(addrs))
 	return addrs[index]
 }
 
