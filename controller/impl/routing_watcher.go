@@ -38,11 +38,13 @@ type RoutingWatcher struct {
 	ctx          context.Context
 	cancelFunc   context.CancelFunc
 	loc          *time.Location
+	metrics      *Metrics
 }
 
 func NewRoutingWatcher() (*RoutingWatcher, error) {
 	routingWatcher := &RoutingWatcher{
 		routingTable: &common.RoutingTable{},
+		metrics:      NewMetrics("routing_watcher"),
 	}
 	client, err := clientv3.New(clientv3.Config{
 		Endpoints:   []string{etcdUri},
@@ -73,6 +75,7 @@ func (r *RoutingWatcher) Run() {
 		mlog.Fatalf("failed to init routing table: %v", err)
 	}
 	mlog.Debugf("init routing table successfully")
+	go r.metrics.Start("localhost:5300")
 	go r.watchLoop()
 	go r.updateLoop()
 	mlog.Info("routing watcher start to work")
@@ -234,6 +237,7 @@ func (r *RoutingWatcher) updateRoutingToEtcd() error {
 
 	if txnResp.Succeeded {
 		r.version.Add(1)
+		r.metrics.setRoutingTableSize(int64(len(bytes)))
 		mlog.Info("update routing table to etcd successfully",
 			zap.Any("routing table", routing), zap.Any("version", version))
 	} else {
@@ -287,6 +291,7 @@ func (r *RoutingWatcher) addEndpoint(groupName string, hostName string, endpoint
 	if err := r.routingTable.Insert(groupName, hostName, endpointInfo); err != nil {
 		mlog.Errorf("failed to add endpoint, err: %v", err)
 	}
+	r.metrics.incrQuestNumber()
 }
 
 func parseHeartbeatKey(key string) (string, string, string, error) {
@@ -316,6 +321,7 @@ func (r *RoutingWatcher) deleteEndpoint(groupName string, hostName string, eidSt
 	if err := r.routingTable.Delete(groupName, hostName, eidStr); err != nil {
 		mlog.Errorf("failed to delete endpoint, err: %v", err)
 	}
+	r.metrics.descServerNumber()
 }
 
 func (r *RoutingWatcher) cloneRoutingTable() *routingpb.RoutingTable {

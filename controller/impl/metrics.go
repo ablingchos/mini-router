@@ -1,4 +1,4 @@
-package consumer
+package controller
 
 import (
 	"net"
@@ -18,8 +18,9 @@ import (
 )
 
 type Metrics struct {
-	quest_number prometheus.Counter
-	fail_number  prometheus.Counter
+	grpc_request       prometheus.Counter
+	server_number      prometheus.Counter
+	routing_table_size prometheus.Gauge
 
 	p_cpu          prometheus.Gauge
 	p_mem          prometheus.Gauge
@@ -32,13 +33,17 @@ type Metrics struct {
 
 func NewMetrics(id string) *Metrics {
 	return &Metrics{
-		quest_number: prometheus.NewCounter(prometheus.CounterOpts{
+		grpc_request: prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "quest_number_" + id,
 			Help: "Total quest number",
 		}),
-		fail_number: prometheus.NewCounter(prometheus.CounterOpts{
-			Name: "fail_number_" + id,
-			Help: "Total fail number",
+		server_number: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "server_number_" + id,
+			Help: "Total register number",
+		}),
+		routing_table_size: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "routing_table_size" + id,
+			Help: "Total routing table size",
 		}),
 		p_cpu: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "cpu_percent_" + id,
@@ -73,11 +78,19 @@ func NewMetrics(id string) *Metrics {
 }
 
 func (m *Metrics) incrQuestNumber() {
-	m.quest_number.Inc()
+	m.grpc_request.Inc()
 }
 
-func (m *Metrics) incrFailNumber() {
-	m.fail_number.Inc()
+func (m *Metrics) incrServerNumber() {
+	m.server_number.Inc()
+}
+
+func (m *Metrics) descServerNumber() {
+	m.server_number.Desc()
+}
+
+func (m *Metrics) setRoutingTableSize(size int64) {
+	m.routing_table_size.Set(float64(size))
 }
 
 func (m *Metrics) Start(addr string) {
@@ -91,7 +104,8 @@ func (m *Metrics) Start(addr string) {
 	}
 	port = strconv.Itoa(port_i + 1000)
 
-	prometheus.MustRegister(m.quest_number)
+	prometheus.MustRegister(m.grpc_request)
+	prometheus.MustRegister(m.server_number)
 	prometheus.MustRegister(m.p_cpu)
 	prometheus.MustRegister(m.p_mem)
 	prometheus.MustRegister(m.p_packets_recv)

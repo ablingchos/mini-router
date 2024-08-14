@@ -27,12 +27,15 @@ const (
 
 type RegisterServer struct {
 	etcdClient *clientv3.Client
+	metrics    *Metrics
 
 	providerpb.UnimplementedProviderServiceServer
 }
 
 func NewRegisterServer() (*RegisterServer, error) {
-	registerServer := &RegisterServer{}
+	registerServer := &RegisterServer{
+		metrics: NewMetrics("health_checker"),
+	}
 	client, err := clientv3.New(clientv3.Config{
 		Endpoints:   []string{etcdUri},
 		DialTimeout: 5 * time.Second,
@@ -45,11 +48,19 @@ func NewRegisterServer() (*RegisterServer, error) {
 }
 
 func (r *RegisterServer) Register(ctx context.Context, req *providerpb.RegisterRequest) (*providerpb.RegisterReply, error) {
-	eid, err := r.generateEid(ctx)
-	if err != nil {
-		mlog.Errorf("failed to generate new eid: %v", err)
-		return nil, util.ErrorWithPos(err)
+	var eid int64
+	// 测试用，注册请求自带eid的话不用去生成唯一eid
+	if req.GetEid() != 0 {
+		eid = req.Eid
+	} else {
+		generateEid, err := r.generateEid(ctx)
+		if err != nil {
+			mlog.Errorf("failed to generate new eid: %v", err)
+			return nil, util.ErrorWithPos(err)
+		}
+		eid = generateEid
 	}
+
 	// 在etcd中注册的key，四段式: "/heartbeat/group1/host1/eid"
 	keys := []string{routingHeartbeatKey, req.GroupName, req.HostName, strconv.Itoa(int(eid))}
 	endpointKey := strings.Join(keys, "/")
@@ -82,6 +93,7 @@ func (r *RegisterServer) Register(ctx context.Context, req *providerpb.RegisterR
 }
 
 func (r *RegisterServer) Run() {
+	go r.metrics.Start("localhost" + healthCheckPort)
 	lis, err := net.Listen("tcp", healthCheckPort)
 	if err != nil {
 		mlog.Fatalf("failed to listen port %v: %v", healthCheckPort, err)
@@ -95,6 +107,7 @@ func (r *RegisterServer) Run() {
 }
 
 func (r *RegisterServer) Heartbeat(ctx context.Context, req *providerpb.HeartbeatRequest) (*providerpb.HeartbeatReply, error) {
+	r.metrics.incrQuestNumber()
 	// keep alive
 	if _, err := r.etcdClient.KeepAliveOnce(ctx, clientv3.LeaseID(req.GetLeaseId())); err != nil {
 		mlog.Errorf("failed to keep alive endpoint: [%v %v %v], leaseid: %v", req.GetGroupName(), req.GetHostName(), req.GetEid(), req.GetLeaseId())
@@ -105,6 +118,7 @@ func (r *RegisterServer) Heartbeat(ctx context.Context, req *providerpb.Heartbea
 }
 
 func (r *RegisterServer) Unregister(ctx context.Context, req *providerpb.UnregisterRequest) (*providerpb.UnregisterReply, error) {
+	r.metrics.incrQuestNumber()
 	if _, err := r.etcdClient.Revoke(ctx, clientv3.LeaseID(req.GetLeaseId())); err != nil {
 		return nil, util.ErrorWithPos(err)
 	}

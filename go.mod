@@ -5,13 +5,13 @@ go 1.21.1
 require (
 	git.woa.com/kefuai/mini-router/consumer v0.0.0-00010101000000-000000000000
 	git.woa.com/kefuai/mini-router/controller v0.0.0-00010101000000-000000000000
+	git.woa.com/kefuai/mini-router/pkg v0.1.7
 	git.woa.com/kefuai/mini-router/provider v0.0.0-00010101000000-000000000000
 	git.woa.com/mfcn/ms-go v0.4.74
 	go.uber.org/zap v1.27.0
 )
 
 require (
-	git.woa.com/kefuai/mini-router/pkg v0.1.5 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/coreos/go-semver v0.3.0 // indirect

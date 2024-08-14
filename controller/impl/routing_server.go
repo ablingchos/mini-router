@@ -33,6 +33,7 @@ type RoutingServer struct {
 	loc          *time.Location
 	changeLogs   []*routingpb.ChangeRecords
 	mu           sync.RWMutex
+	metrics      *Metrics
 
 	consumerpb.UnimplementedConsumerServiceServer
 }
@@ -41,6 +42,7 @@ func NewRoutingServer() (*RoutingServer, error) {
 	server := &RoutingServer{
 		changeLogs:   make([]*routingpb.ChangeRecords, changeLogLength, changeLogLength),
 		routingTable: atomic.Pointer[routingpb.RoutingTable]{},
+		metrics:      NewMetrics("routing_server"),
 	}
 	client, err := clientv3.New(clientv3.Config{
 		Endpoints:   []string{etcdUri},
@@ -57,6 +59,7 @@ func NewRoutingServer() (*RoutingServer, error) {
 }
 
 func (s *RoutingServer) Run() {
+	go s.metrics.Start("localhost" + routingServerPort)
 	go s.serveGrpc()
 	// go s.watchLoop()
 	go s.pullLoop()
