@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"git.woa.com/mfcn/ms-go/pkg/mlog"
@@ -18,6 +19,8 @@ import (
 )
 
 type Metrics struct {
+	quest_number   prometheus.Counter
+	fail_number    prometheus.Counter
 	p_cpu          prometheus.Gauge
 	p_mem          prometheus.Gauge
 	p_packets_recv prometheus.Gauge
@@ -25,10 +28,19 @@ type Metrics struct {
 	p_bytes_recv   prometheus.Gauge
 	p_bytes_sent   prometheus.Gauge
 	p_delay        prometheus.Histogram
+	mu             sync.Mutex
 }
 
 func NewMetrics(id string) *Metrics {
 	return &Metrics{
+		quest_number: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "quest_number_" + id,
+			Help: "Total quest number",
+		}),
+		fail_number: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "fail_number_" + id,
+			Help: "Total fail number",
+		}),
 		p_cpu: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "cpu_percent_" + id,
 			Help: "Current CPU usage percent",
@@ -61,6 +73,14 @@ func NewMetrics(id string) *Metrics {
 	}
 }
 
+func (m *Metrics) incrQuestNumber() {
+	m.quest_number.Add(1)
+}
+
+func (m *Metrics) incrFailNumber() {
+	m.fail_number.Add(1)
+}
+
 func (m *Metrics) Start(addr string) {
 	_, port, err := net.SplitHostPort(addr)
 	if err != nil {
@@ -72,6 +92,7 @@ func (m *Metrics) Start(addr string) {
 	}
 	port = strconv.Itoa(port_i + 1000)
 
+	prometheus.MustRegister(m.quest_number)
 	prometheus.MustRegister(m.p_cpu)
 	prometheus.MustRegister(m.p_mem)
 	prometheus.MustRegister(m.p_packets_recv)
@@ -84,10 +105,9 @@ func (m *Metrics) Start(addr string) {
 
 	// 每5s更新一次
 	ticker := time.NewTicker(5 * time.Second)
-	for {
-		for range ticker.C {
-			m.Tick()
-		}
+	for range ticker.C {
+		m.Tick()
+		mlog.Debug("tick complete")
 	}
 }
 

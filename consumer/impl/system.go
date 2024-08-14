@@ -28,6 +28,7 @@ var (
 )
 
 const (
+	metricsAddr         = "localhost:6060"
 	discoverServiceAddr = "localhost:5200"
 	pullInterval        = 5
 )
@@ -40,6 +41,7 @@ type Consumer struct {
 	mu           sync.RWMutex
 	version      int64
 	virtualNode  int
+	metrics      *Metrics
 
 	hashRing atomic.Pointer[map[string]*consistenthash.HashRing]
 
@@ -113,6 +115,11 @@ func (c *Consumer) processRoutingTable(log *routingpb.ChangeRecords, version int
 
 }
 
+func (c *Consumer) reportMetrics() {
+	c.metrics = NewMetrics("1")
+	c.metrics.Start(metricsAddr)
+}
+
 // 全量更新哈希环
 func (c *Consumer) updatehashRing() {
 	hashRing := make(map[string]*consistenthash.HashRing)
@@ -164,8 +171,12 @@ func (c *Consumer) updateRoutingTable() {
 }
 
 func (c *Consumer) getTargetByKey(hostName string, key string) (string, error) {
+	defer func() {
+		c.metrics.incrQuestNumber()
+	}()
 	routing := c.config.Load()
 	if _, ok := routing.GetHosts()[hostName]; !ok {
+		c.metrics.incrFailNumber()
 		return "", util.ErrorfWithPos("no such host [%v] in routing table", hostName)
 	}
 	host := routing.GetHosts()[hostName]
@@ -185,18 +196,25 @@ func (c *Consumer) getTargetByKey(hostName string, key string) (string, error) {
 			return combineAddr(strategy.GetDestination().GetIp(), strategy.GetDestination().GetPort()), nil
 		}
 	}
+
+	c.metrics.incrFailNumber()
 	return "", util.ErrorfWithPos("no match rules, expect: %v, actual: %v", strategy, key)
 }
 
 func (c *Consumer) getTargetByConfig(hostName string) (string, error) {
+	defer func() {
+		c.metrics.incrQuestNumber()
+	}()
 	routing := c.config.Load()
 	if _, ok := routing.GetHosts()[hostName]; !ok {
+		c.metrics.incrFailNumber()
 		return "", util.ErrorfWithPos("no such host [%v] in routing config", hostName)
 	}
 	hostConfig := routing.GetHosts()[hostName]
 
 	c.mu.RLock()
 	if _, ok := c.routingTable.GetHosts()[hostName]; !ok {
+		c.metrics.incrFailNumber()
 		return "", util.ErrorfWithPos("no such host [%v] in routing table", hostName)
 	}
 	hostRouting := c.routingTable.GetHosts()[hostName]

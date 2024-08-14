@@ -41,6 +41,7 @@ func (c *Consumer) Init() error {
 	}
 	c.coverRoutingTable(resp.GetGroup(), resp.GetVersion())
 	go c.watchLoop()
+	go c.reportMetrics()
 	return nil
 }
 

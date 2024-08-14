@@ -1,31 +1,31 @@
 version: '3'
 services:
-  etcd:
-    image: quay.io/coreos/etcd
-    container_name: etcd
-    ports:
-      - "2379:2379"
-      - "2380:2380"
-    command: >
-      /usr/local/bin/etcd
-      --name etcd0
-      --data-dir /etcd-data
-      --listen-client-urls http://0.0.0.0:2379
-      --advertise-client-urls http://0.0.0.0:2379
-      --listen-peer-urls http://0.0.0.0:2380
-      --initial-advertise-peer-urls http://0.0.0.0:2380
-      --initial-cluster etcd0=http://0.0.0.0:2380
-      --initial-cluster-token etcd-cluster-1
-      --initial-cluster-state new
-      --max-request-bytes=10485760
+  # etcd:
+  #   image: quay.io/coreos/etcd
+  #   container_name: etcd
+  #   ports:
+  #     - "2379:2379"
+  #     - "2380:2380"
+  #   command: >
+  #     /usr/local/bin/etcd
+  #     --name etcd0
+  #     --data-dir /etcd-data
+  #     --listen-client-urls http://0.0.0.0:2379
+  #     --advertise-client-urls http://0.0.0.0:2379
+  #     --listen-peer-urls http://0.0.0.0:2380
+  #     --initial-advertise-peer-urls http://0.0.0.0:2380
+  #     --initial-cluster etcd0=http://0.0.0.0:2380
+  #     --initial-cluster-token etcd-cluster-1
+  #     --initial-cluster-state new
+  #     --max-request-bytes=10485760
 
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
     volumes:
-      - ./configs/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./config/prometheus.yaml:/etc/prometheus/prometheus.yaml
     command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--config.file=/etc/prometheus/prometheus.yaml'
     ports:
       - "9090:9090"
 
@@ -60,3 +60,7 @@ services:
       - grafana-data:/var/lib/grafana
     depends_on:
       - influxdb
+
+volumes:
+  influxdb-data:
+  grafana-data:

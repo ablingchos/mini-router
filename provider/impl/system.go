@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"encoding/json"
+	"net"
 	"sync"
 	"time"
 
@@ -34,6 +35,7 @@ type Provider struct {
 	cancel  context.CancelFunc
 
 	discoverClient providerpb.ProviderServiceClient
+	providerpb.UnimplementedConsumerServiceServer
 }
 
 func (p *Provider) initializeProviderForTest(port string, eid int64) error {
@@ -88,6 +90,19 @@ func (p *Provider) initializeProvider(configPath string) error {
 	return nil
 }
 
+func (p *Provider) serveGrpc() {
+	lis, err := net.Listen("tcp", ":"+p.config.Port)
+	if err != nil {
+		mlog.Fatalf("failed to listen port %v: %v", p.config.Port, err)
+	}
+	s := grpc.NewServer()
+	providerpb.RegisterConsumerServiceServer(s, p)
+	mlog.Infof("server listening on port: %v", lis.Addr())
+	if err := s.Serve(lis); err != nil {
+		mlog.Fatalf("failed to serve: %v", err)
+	}
+}
+
 func (p *Provider) grpcConnect() error {
 	conn, err := grpc.NewClient(healthCheckAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
@@ -106,16 +121,12 @@ func (p *Provider) register() error {
 	p.leaseId = resp.GetLeaseId()
 	// go p.serverGrpc()
 	go p.controlLoop()
+	go p.serveGrpc()
 
 	return nil
 }
 
-// func (p *Provider) serverGrpc() {
-// 	lis, err := net.Listen("tcp", ":" + p.config.Port)
-// 	if err != nil {
-// 		mlog.Fatalf("failed to listen port %v: %v", p.config.Port, err)
-// 	}
-// 	s := grpc.NewServer()
+// func (p *Provider) Communicate(ctx context.Context, req *providerpb.CommunicateRequest) (*providerpb.CommunicateReply, error) {
 
 // }
 
