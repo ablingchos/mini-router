@@ -9,7 +9,6 @@ import (
 	"git.woa.com/kefuai/mini-router/pkg/proto/routingpb"
 	"git.woa.com/mfcn/ms-go/pkg/mlog"
 	"git.woa.com/mfcn/ms-go/pkg/util"
-	"github.com/samber/lo"
 	"go.uber.org/zap"
 )
 
@@ -17,6 +16,7 @@ func NewConsumer(configPath string, virtualNode int) (*Consumer, error) {
 	var err error
 	once.Do(func() {
 		consumer = &Consumer{
+			hostName:    make([]string, 0),
 			hashRing:    atomic.Pointer[map[string]*consistenthash.HashRing]{},
 			virtualNode: virtualNode,
 		}
@@ -31,16 +31,14 @@ func NewConsumer(configPath string, virtualNode int) (*Consumer, error) {
 }
 
 func (c *Consumer) Init() error {
-	config := c.getConfig()
 	resp, err := c.discoverClient.ConsumerInit(c.ctx, &consumerpb.ConsumerInitRequest{
-		GroupName: config.GetName(),
-		HostName:  lo.Keys(config.GetHosts()),
+		GroupName: c.groupName,
+		HostName:  c.hostName,
 	})
 	if err != nil {
 		return util.ErrorWithPos(err)
 	}
-	c.coverRoutingTable(resp.GetGroup(), resp.GetVersion())
-	go c.watchLoop()
+	c.initRoutingTable(resp.GetGroup())
 	go c.reportMetrics()
 	return nil
 }

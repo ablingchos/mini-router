@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"math/rand"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	consistenthash "git.woa.com/kefuai/mini-router/consumer/impl/algorithm/hash"
 	"git.woa.com/kefuai/mini-router/consumer/impl/algorithm/weight"
@@ -35,6 +35,9 @@ const (
 
 type Consumer struct {
 	config       atomic.Pointer[routingpb.Group]
+	groupName    string
+	hostName     []string
+	hostMap      map[string]struct{}
 	ctx          context.Context
 	cancel       context.CancelFunc
 	routingTable *routingpb.Group
@@ -64,6 +67,8 @@ func (c *Consumer) initializeConsumer(configPath string) error {
 		return util.ErrorWithPos(err)
 	}
 	c.config.Store(group)
+	c.groupName = group.GetName()
+	c.hostName = lo.Keys(group.GetHosts())
 	mlog.Debug("load config successfully", zap.Any("config", group))
 
 	c.ctx, c.cancel = context.WithCancel(context.Background())
@@ -71,24 +76,6 @@ func (c *Consumer) initializeConsumer(configPath string) error {
 		return util.ErrorWithPos(err)
 	}
 	return nil
-}
-
-func (c *Consumer) watchLoop() {
-	ticker := time.NewTicker(pullInterval * time.Second)
-	mlog.Debug("start to run watch loop")
-	for {
-		select {
-		case <-ticker.C:
-			c.updateRoutingTable()
-		case <-c.ctx.Done():
-			mlog.Info("watch loop stopped")
-			return
-		}
-	}
-}
-
-func (c *Consumer) getConfig() *routingpb.Group {
-	return c.config.Load()
 }
 
 func (c *Consumer) grpcConnect() error {
@@ -101,17 +88,23 @@ func (c *Consumer) grpcConnect() error {
 }
 
 // 全量覆盖
-func (c *Consumer) coverRoutingTable(routingTable *routingpb.Group, version int64) {
+func (c *Consumer) initRoutingTable(routingTable *routingpb.Group) {
+	config := c.config.Load()
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.routingTable = routingTable
-	c.version = version
-	go c.updatehashRing()
+	for _, host := range config.GetHosts() {
+		hostName := host.GetName()
+		c.routingTable.Hosts[hostName].RoutingRule = host.GetRoutingRule()
+		c.routingTable.Hosts[hostName].UserRule = host.GetUserRule()
+	}
+	go c.inithashRing()
+	go c.streamWatch()
 	// mlog.Debug("cover routing table successfully", zap.Any("routing table", routingTable), zap.Any("version", version))
 }
 
 // TODO: 增量更新
-func (c *Consumer) processRoutingTable(log *routingpb.ChangeRecords, version int64) {
+func (c *Consumer) processRoutingTable(log *routingpb.ChangeRecords) {
 
 }
 
@@ -121,16 +114,16 @@ func (c *Consumer) reportMetrics() {
 }
 
 // 全量更新哈希环
-func (c *Consumer) updatehashRing() {
+func (c *Consumer) inithashRing() {
 	hashRing := make(map[string]*consistenthash.HashRing)
-	config := c.config.Load()
+	routing := c.routingTable
 
 	c.mu.RLock()
-	for name, host := range config.GetHosts() {
+	for name, host := range routing.GetHosts() {
 		hostRing := consistenthash.NewHashRing(c.virtualNode)
 		if host.GetRoutingRule().GetLb() == routingpb.LoadBalancer_consistent_hash {
 			for _, endpoint := range c.routingTable.GetHosts()[name].GetEndpoints() {
-				hostRing.AddNode(combineAddr(endpoint.GetIp(), endpoint.GetPort()))
+				hostRing.AddNode(strconv.Itoa(int(endpoint.GetEid())))
 			}
 			hashRing[name] = hostRing
 		}
@@ -151,30 +144,101 @@ func (c *Consumer) consistenthashRouting(hostName string, key string, target str
 	return ring[hostName].GetNode(strings.TrimPrefix(key, target)), nil
 }
 
-func (c *Consumer) updateRoutingTable() {
-	config := c.getConfig()
-	resp, err := c.discoverClient.ConsumerUpdate(c.ctx, &consumerpb.ConsumerUpdateRequest{
-		GroupName: config.GetName(),
-		HostName:  lo.Keys(config.GetHosts()),
-		Version:   c.version,
-	})
+func (c *Consumer) streamWatch() {
+	req := &consumerpb.RoutingChangeRequest{}
+	stream, err := c.discoverClient.RoutingChange(c.ctx, req)
 	if err != nil {
-		mlog.Warnf("failed to update routing table: %v", err)
+		mlog.Errorf("failed to create stream: %v", err)
 		return
 	}
-	if resp.Outdated {
-		// mlog.Debugf("routing table outdated, start to cover old version")
-		c.coverRoutingTable(resp.GetGroup(), resp.GetVersion())
-	} else {
-		c.processRoutingTable(resp.GetChanges(), resp.GetVersion())
+
+	for {
+		resp, err := stream.Recv()
+		if err != nil {
+			mlog.Errorf("failed to receive from stream: %v", err)
+			return
+		}
+		c.processStream(resp)
 	}
+}
+
+func (c *Consumer) processStream(resp *consumerpb.RoutingChangeReply) error {
+	config := c.config.Load()
+
+	added := make([]string, 0)
+	delete := make([]string, 0)
+	for _, key := range resp.GetAddedEndpoints() {
+		groupName, hostName, eid, err := parseKey(key)
+		if err != nil {
+			mlog.Errorf("failed to parse key: %v", err)
+			continue
+		}
+		if groupName != config.GetName() || config.GetHosts()[hostName] == nil {
+			continue
+		}
+		added = append(added, hostName+"/"+eid)
+	}
+	c.processAddEndpoint(added)
+
+	for _, key := range resp.GetDeletedEndpoints() {
+		groupName, hostName, eid, err := parseKey(key)
+		if err != nil {
+			mlog.Errorf("failed to parse key: %v", err)
+			continue
+		}
+		if groupName != config.GetName() || config.GetHosts()[hostName] == nil {
+			continue
+		}
+		delete = append(delete, hostName+"/"+eid)
+	}
+	c.processDeleteEndpoint(delete)
+
+	return nil
+}
+
+func (c *Consumer) processAddEndpoint(addKey []string) {
+
+}
+
+func (c *Consumer) processAddHashRing(deleteKey []string) {
+
+}
+
+func (c *Consumer) processDeleteEndpoint(deleteKey []string) {
+	hash := *(c.hashRing.Load())
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	routing := c.routingTable
+	for _, key := range deleteKey {
+		parts := strings.Split(key, "/")
+		eid, err := strconv.Atoi(parts[1])
+		if err != nil {
+			mlog.Errorf("wrong format: %v", key)
+			continue
+		}
+		delete(routing.GetHosts()[parts[0]].GetEndpoints(), int64(eid))
+		hash[parts[0]].RemoveNode(parts[1])
+		mlog.Infof("delete offline endpoint [%v %v]", parts[0], eid)
+	}
+
+}
+
+func parseKey(key string) (string, string, string, error) {
+	parts := strings.Split(key, "/")
+	if len(parts) != 3 {
+		return "", "", "", util.ErrorfWithPos("wrong format of key: %v", key)
+	}
+	return parts[0], parts[1], parts[2], nil
 }
 
 func (c *Consumer) getTargetByKey(hostName string, key string) (string, error) {
 	defer func() {
 		c.metrics.incrQuestNumber()
 	}()
-	routing := c.config.Load()
+
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	routing := c.routingTable
 	if _, ok := routing.GetHosts()[hostName]; !ok {
 		c.metrics.incrFailNumber()
 		return "", util.ErrorfWithPos("no such host [%v] in routing table", hostName)
@@ -182,7 +246,16 @@ func (c *Consumer) getTargetByKey(hostName string, key string) (string, error) {
 	host := routing.GetHosts()[hostName]
 
 	if host.GetRoutingRule().GetLb() == routingpb.LoadBalancer_consistent_hash {
-		return c.consistenthashRouting(hostName, key, host.GetRoutingRule().GetTarget())
+		eidStr, err := c.consistenthashRouting(hostName, key, host.GetRoutingRule().GetTarget())
+		if err != nil {
+			return "", util.ErrorWithPos(err)
+		}
+		eid, err := strconv.Atoi(eidStr)
+		if err != nil {
+			return "", util.ErrorWithPos(err)
+		}
+		endpoint := host.GetEndpoints()[int64(eid)]
+		return combineAddr(endpoint.GetIp(), endpoint.GetPort()), nil
 	}
 
 	strategy := host.GetUserRule()
@@ -196,7 +269,6 @@ func (c *Consumer) getTargetByKey(hostName string, key string) (string, error) {
 			return combineAddr(strategy.GetDestination().GetIp(), strategy.GetDestination().GetPort()), nil
 		}
 	}
-
 	c.metrics.incrFailNumber()
 	return "", util.ErrorfWithPos("no match rules, expect: %v, actual: %v", strategy, key)
 }
@@ -205,22 +277,18 @@ func (c *Consumer) getTargetByConfig(hostName string) (string, error) {
 	defer func() {
 		c.metrics.incrQuestNumber()
 	}()
-	routing := c.config.Load()
-	if _, ok := routing.GetHosts()[hostName]; !ok {
-		c.metrics.incrFailNumber()
-		return "", util.ErrorfWithPos("no such host [%v] in routing config", hostName)
-	}
-	hostConfig := routing.GetHosts()[hostName]
-
 	c.mu.RLock()
-	if _, ok := c.routingTable.GetHosts()[hostName]; !ok {
+	defer c.mu.RUnlock()
+
+	routing := c.routingTable
+	if _, ok := routing.GetHosts()[hostName]; !ok {
 		c.metrics.incrFailNumber()
 		return "", util.ErrorfWithPos("no such host [%v] in routing table", hostName)
 	}
-	hostRouting := c.routingTable.GetHosts()[hostName]
-	defer c.mu.RUnlock()
+
+	hostRouting := routing.GetHosts()[hostName]
 	var targetAddr string
-	switch hostConfig.GetRoutingRule().GetLb() {
+	switch hostRouting.GetRoutingRule().GetLb() {
 	case routingpb.LoadBalancer_random:
 		targetAddr = c.randomRouting(lo.MapToSlice(hostRouting.GetEndpoints(), func(eid int64, endpoint *routingpb.Endpoint) string {
 			return combineAddr(endpoint.GetIp(), endpoint.GetPort())
@@ -230,7 +298,7 @@ func (c *Consumer) getTargetByConfig(hostName string) (string, error) {
 			return endpoint
 		}))
 	case routingpb.LoadBalancer_target:
-		targetAddr = hostConfig.GetRoutingRule().GetTarget()
+		targetAddr = hostRouting.GetRoutingRule().GetTarget()
 	}
 
 	return targetAddr, nil
@@ -252,12 +320,4 @@ func (c *Consumer) weightRouting(endpoints []*routingpb.Endpoint) string {
 
 func combineAddr(ip string, port string) string {
 	return ip + ":" + port
-}
-
-func parseAddr(addr string) ([]string, error) {
-	resp := strings.Split(addr, ":")
-	if len(resp) != 2 {
-		return nil, util.ErrorfWithPos("wrong addr format: %v", addr)
-	}
-	return resp, nil
 }
