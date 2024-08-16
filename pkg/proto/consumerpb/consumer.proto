@@ -6,7 +6,8 @@ import "pkg/proto/routingpb/routing.proto";
 
 service ConsumerService {
   rpc ConsumerInit(ConsumerInitRequest) returns (ConsumerInitReply);
-  rpc ConsumerUpdate(ConsumerUpdateRequest) returns (ConsumerUpdateReply);
+  rpc RoutingChange(RoutingChangeRequest) returns (stream RoutingChangeReply);
+  rpc PullEndpoint(PullEndpointRequest) returns (PullEndpointReply);
 }
 
 message ConsumerInitRequest {
@@ -16,18 +17,19 @@ message ConsumerInitRequest {
 
 message ConsumerInitReply {
   routingpb.Group group = 1;  // 包含所需host信息的路由表
-  int64 version         = 2;  // 路由表当前版本号
 }
 
-message ConsumerUpdateRequest {
-  string group_name         = 1;  // 所在的group
-  repeated string host_name = 2;  // 需要的host列表
-  int64 version             = 3;  // 上次所获取到的版本号
+message RoutingChangeRequest {}
+
+message RoutingChangeReply {
+  repeated string deleted_endpoints = 1;  // 删除的endpoint唯一标识(group/host/eid)
+  repeated string added_endpoints   = 2;  // 增加的endpoint唯一标识(group/host/eid)
 }
 
-message ConsumerUpdateReply {
-  routingpb.ChangeRecords changes = 1;  // 该consumer所需的日志信息
-  int64 version                   = 2;  // 路由表当前版本号
-  bool outdated                   = 3;  // 是否过期，过期则重发所有路由表
-  routingpb.Group group           = 4;  // 过期重发的全量路由表
+message PullEndpointRequest {
+  repeated string endpoints = 1;
+}
+
+message PullEndpointReply {
+  map<string, routingpb.Endpoint> endpoints = 1;
 }

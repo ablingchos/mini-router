@@ -23,7 +23,8 @@ const _ = grpc.SupportPackageIsVersion7
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ConsumerServiceClient interface {
 	ConsumerInit(ctx context.Context, in *ConsumerInitRequest, opts ...grpc.CallOption) (*ConsumerInitReply, error)
-	ConsumerUpdate(ctx context.Context, in *ConsumerUpdateRequest, opts ...grpc.CallOption) (*ConsumerUpdateReply, error)
+	RoutingChange(ctx context.Context, in *RoutingChangeRequest, opts ...grpc.CallOption) (ConsumerService_RoutingChangeClient, error)
+	PullEndpoint(ctx context.Context, in *PullEndpointRequest, opts ...grpc.CallOption) (*PullEndpointReply, error)
 }
 
 type consumerServiceClient struct {
@@ -43,9 +44,41 @@ func (c *consumerServiceClient) ConsumerInit(ctx context.Context, in *ConsumerIn
 	return out, nil
 }
 
-func (c *consumerServiceClient) ConsumerUpdate(ctx context.Context, in *ConsumerUpdateRequest, opts ...grpc.CallOption) (*ConsumerUpdateReply, error) {
-	out := new(ConsumerUpdateReply)
-	err := c.cc.Invoke(ctx, "/consumerpb.ConsumerService/ConsumerUpdate", in, out, opts...)
+func (c *consumerServiceClient) RoutingChange(ctx context.Context, in *RoutingChangeRequest, opts ...grpc.CallOption) (ConsumerService_RoutingChangeClient, error) {
+	stream, err := c.cc.NewStream(ctx, &ConsumerService_ServiceDesc.Streams[0], "/consumerpb.ConsumerService/RoutingChange", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &consumerServiceRoutingChangeClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type ConsumerService_RoutingChangeClient interface {
+	Recv() (*RoutingChangeReply, error)
+	grpc.ClientStream
+}
+
+type consumerServiceRoutingChangeClient struct {
+	grpc.ClientStream
+}
+
+func (x *consumerServiceRoutingChangeClient) Recv() (*RoutingChangeReply, error) {
+	m := new(RoutingChangeReply)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+func (c *consumerServiceClient) PullEndpoint(ctx context.Context, in *PullEndpointRequest, opts ...grpc.CallOption) (*PullEndpointReply, error) {
+	out := new(PullEndpointReply)
+	err := c.cc.Invoke(ctx, "/consumerpb.ConsumerService/PullEndpoint", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +90,8 @@ func (c *consumerServiceClient) ConsumerUpdate(ctx context.Context, in *Consumer
 // for forward compatibility
 type ConsumerServiceServer interface {
 	ConsumerInit(context.Context, *ConsumerInitRequest) (*ConsumerInitReply, error)
-	ConsumerUpdate(context.Context, *ConsumerUpdateRequest) (*ConsumerUpdateReply, error)
+	RoutingChange(*RoutingChangeRequest, ConsumerService_RoutingChangeServer) error
+	PullEndpoint(context.Context, *PullEndpointRequest) (*PullEndpointReply, error)
 	mustEmbedUnimplementedConsumerServiceServer()
 }
 
@@ -68,8 +102,11 @@ type UnimplementedConsumerServiceServer struct {
 func (UnimplementedConsumerServiceServer) ConsumerInit(context.Context, *ConsumerInitRequest) (*ConsumerInitReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ConsumerInit not implemented")
 }
-func (UnimplementedConsumerServiceServer) ConsumerUpdate(context.Context, *ConsumerUpdateRequest) (*ConsumerUpdateReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ConsumerUpdate not implemented")
+func (UnimplementedConsumerServiceServer) RoutingChange(*RoutingChangeRequest, ConsumerService_RoutingChangeServer) error {
+	return status.Errorf(codes.Unimplemented, "method RoutingChange not implemented")
+}
+func (UnimplementedConsumerServiceServer) PullEndpoint(context.Context, *PullEndpointRequest) (*PullEndpointReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method PullEndpoint not implemented")
 }
 func (UnimplementedConsumerServiceServer) mustEmbedUnimplementedConsumerServiceServer() {}
 
@@ -102,20 +139,41 @@ func _ConsumerService_ConsumerInit_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ConsumerService_ConsumerUpdate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ConsumerUpdateRequest)
+func _ConsumerService_RoutingChange_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(RoutingChangeRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(ConsumerServiceServer).RoutingChange(m, &consumerServiceRoutingChangeServer{stream})
+}
+
+type ConsumerService_RoutingChangeServer interface {
+	Send(*RoutingChangeReply) error
+	grpc.ServerStream
+}
+
+type consumerServiceRoutingChangeServer struct {
+	grpc.ServerStream
+}
+
+func (x *consumerServiceRoutingChangeServer) Send(m *RoutingChangeReply) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+func _ConsumerService_PullEndpoint_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PullEndpointRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ConsumerServiceServer).ConsumerUpdate(ctx, in)
+		return srv.(ConsumerServiceServer).PullEndpoint(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/consumerpb.ConsumerService/ConsumerUpdate",
+		FullMethod: "/consumerpb.ConsumerService/PullEndpoint",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ConsumerServiceServer).ConsumerUpdate(ctx, req.(*ConsumerUpdateRequest))
+		return srv.(ConsumerServiceServer).PullEndpoint(ctx, req.(*PullEndpointRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -132,10 +190,16 @@ var ConsumerService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _ConsumerService_ConsumerInit_Handler,
 		},
 		{
-			MethodName: "ConsumerUpdate",
-			Handler:    _ConsumerService_ConsumerUpdate_Handler,
+			MethodName: "PullEndpoint",
+			Handler:    _ConsumerService_PullEndpoint_Handler,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "RoutingChange",
+			Handler:       _ConsumerService_RoutingChange_Handler,
+			ServerStreams: true,
+		},
+	},
 	Metadata: "pkg/proto/consumerpb/consumer.proto",
 }

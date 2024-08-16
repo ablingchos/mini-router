@@ -14,6 +14,7 @@ import (
 	"git.woa.com/mfcn/ms-go/pkg/mlog"
 	"git.woa.com/mfcn/ms-go/pkg/util"
 	redis "github.com/go-redis/redis/v8"
+	"github.com/samber/lo"
 	"go.etcd.io/etcd/api/v3/mvccpb"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.uber.org/zap"
@@ -34,8 +35,7 @@ type RoutingServer struct {
 	cacheMap     map[string]*routingpb.Host
 	ctx          context.Context
 	cancelFunc   context.CancelFunc
-	loc          *time.Location
-	changeLogs   []*routingpb.ChangeRecords
+	streams      []consumerpb.ConsumerService_RoutingChangeServer
 	mu           sync.RWMutex
 	metrics      *Metrics
 
@@ -44,8 +44,6 @@ type RoutingServer struct {
 
 func NewRoutingServer() (*RoutingServer, error) {
 	server := &RoutingServer{
-		changeLogs: make([]*routingpb.ChangeRecords, changeLogLength, changeLogLength),
-		// routingTable: atomic.Pointer[routingpb.RoutingTable]{},
 		routingCache: make([]string, 0, cacheSize),
 		cacheMap:     make(map[string]*routingpb.Host, cacheSize),
 		metrics:      NewMetrics("routing_server"),
@@ -76,7 +74,6 @@ func (s *RoutingServer) Run() {
 	go s.metrics.Start("localhost" + routingServerPort)
 	go s.serveGrpc()
 	go s.watchLoop()
-	// go s.pullLoop()
 }
 
 func (s *RoutingServer) Stop() {
@@ -132,6 +129,25 @@ func (s *RoutingServer) getRedis(groupName string, hostName string) (*routingpb.
 	return host, nil
 }
 
+func (s *RoutingServer) RoutingChange(req *consumerpb.RoutingChangeRequest, stream consumerpb.ConsumerService_RoutingChangeServer) error {
+	// 将新连接的客户端添加到 streams 列表中
+	s.mu.Lock()
+	s.streams = append(s.streams, stream)
+	s.mu.Unlock()
+
+	// 等待客户端断开连接
+	<-stream.Context().Done()
+
+	// 从 streams 列表中移除断开连接的客户端
+	s.mu.Lock()
+	lo.DropWhile(s.streams, func(item consumerpb.ConsumerService_RoutingChangeServer) bool {
+		return item == stream
+	})
+	s.mu.Unlock()
+
+	return nil
+}
+
 func (s *RoutingServer) watchLoop() {
 	watchChan := s.etcdClient.Watch(s.ctx, routingHeartbeatKey, clientv3.WithPrefix())
 	for watchResp := range watchChan {
@@ -164,8 +180,54 @@ func (s *RoutingServer) watchLoop() {
 				mlog.Errorf("invalid type of etcd event: %v", event)
 			}
 		}
+		// 向sdk广播消息
+		s.mu.RLock()
+		for _, stream := range s.streams {
+			if err := stream.Send(&consumerpb.RoutingChangeReply{
+				DeletedEndpoints: lo.Keys(deletedEndpoints),
+				AddedEndpoints:   lo.Keys(addedEndpoints),
+			}); err != nil {
+				mlog.Warnf("failed to send to stream: %v", err)
+			}
+		}
+		s.mu.RUnlock()
+	}
+}
+
+func (s *RoutingServer) PullEndpoint(ctx context.Context, req *consumerpb.PullEndpointRequest) (*consumerpb.PullEndpointReply, error) {
+	hosts := []string{}
+	eids := make(map[string]string, len(req.GetEndpoints()))
+	for _, key := range req.GetEndpoints() {
+		lastIndex := strings.LastIndex(key, "/")
+		if lastIndex == -1 {
+			return nil, util.ErrorfWithPos("wrong req format, key: %v", key)
+		}
+		eids[key[:lastIndex]] = key[lastIndex+1:]
+		hosts = append(hosts, key[:lastIndex])
+	}
+	hosts = lo.Uniq(hosts)
+
+	host := make(map[string]*routingpb.Host)
+	for _, key := range hosts {
+		parts := strings.Split(key, "/")
+		if len(parts) != 2 {
+			return nil, util.ErrorfWithPos("wrong req format, key: %v", key)
+		}
+		temp, err := s.getHost(parts[0], parts[1])
+		if err != nil {
+			return nil, util.ErrorWithPos(err)
+		}
+		host[key] = temp
 	}
 
+	resp := &consumerpb.PullEndpointReply{
+		Endpoints: make(map[string]*routingpb.Endpoint, len(req.GetEndpoints())),
+	}
+	for key, eidStr := range eids {
+		eid, _ := strconv.Atoi(eidStr)
+		resp.Endpoints[key+eidStr] = host[key].GetEndpoints()[int64(eid)]
+	}
+	return resp, nil
 }
 
 func (s *RoutingServer) deleteLocalCache(hostKey string, eid int64) {
@@ -184,91 +246,6 @@ func (s *RoutingServer) addLocalCache(hostKey string, eid int64, endpoint *routi
 		return
 	}
 }
-
-// func (s *RoutingServer) pullLoop() {
-// 	ticker := time.NewTicker(pullInterval * time.Second)
-// 	for {
-// 		select {
-// 		case <-ticker.C:
-// 			if err := s.updateLocalRoutingTable(); err != nil {
-// 				mlog.Errorf("failed to update local routing table: %v", err)
-// 			}
-// 		case <-s.ctx.Done():
-// 			mlog.Info("pull loop stopped")
-// 			return
-// 		}
-// 	}
-// }
-
-// func (s *RoutingServer) updateLocalRoutingTable() error {
-// 	resp, err := s.etcdClient.Get(s.ctx, routingTableKey)
-// 	if err != nil {
-// 		return util.ErrorWithPos(err)
-// 	}
-// 	routingTable := &routingpb.RoutingTable{}
-// 	if len(resp.Kvs) == 0 {
-// 		return util.ErrorfWithPos("routing table on etcd is nil")
-// 	}
-// 	if err := json.Unmarshal(resp.Kvs[0].Value, routingTable); err != nil {
-// 		return util.ErrorWithPos(err)
-// 	}
-// 	s.routingTable.Store(routingTable)
-// 	mlog.Debug("update routing table", zap.Any("routing table", routingTable))
-// 	return nil
-// }
-
-// func (s *RoutingServer) watchLoop() {
-// 	watchChan := s.etcdClient.Watch(s.ctx, routingLogPrefix, clientv3.WithPrefix())
-// 	for watchResp := range watchChan {
-// 		for _, event := range watchResp.Events {
-// 			mlog.Debugf("Received etcd event: %v", event)
-// 			switch event.Type {
-// 			case mvccpb.PUT:
-// 				log := &routingpb.ChangeRecords{}
-// 				if err := json.Unmarshal(event.Kv.Value, log); err != nil {
-// 					mlog.Errorf("failed to unmarshal change log: %v", err)
-// 					break
-// 				}
-// 				if !event.IsCreate() {
-// 					mlog.Warn("change log put again", zap.Any("change log", log))
-// 					break
-// 				}
-// 				s.updateLog(log)
-// 			}
-// 		}
-// 	}
-// }
-
-// func (s *RoutingServer) updateLog(log *routingpb.ChangeRecords) {
-// 	targetVersion := log.GetVersion()
-// 	// 版本号初始化为最新version - 1
-// 	if s.logVersion.Load() == 0 {
-// 		s.logVersion.Store(targetVersion - 1)
-// 	}
-// 	currentVersion := s.logVersion.Load()
-// 	if currentVersion >= targetVersion {
-// 		mlog.Fatal("log version illegal", zap.Any("current log version", currentVersion), zap.Any("target version", targetVersion))
-// 	} else if currentVersion+3 < targetVersion {
-// 		s.logVersion.Store(targetVersion)
-// 		s.clearLog()
-// 		mlog.Info("log version too low, clear all log")
-// 	} else {
-// 		s.logVersion.Add(1)
-// 	}
-// 	s.mu.Lock()
-// 	defer s.mu.Unlock()
-// 	// 队头出队
-// 	s.changeLogs = s.changeLogs[1:]
-// 	// 队尾入队
-// 	s.changeLogs = append(s.changeLogs, log)
-// 	mlog.Info("updated log", zap.Any("log version", targetVersion), zap.Any("log", log))
-// }
-
-// func (s *RoutingServer) clearLog() {
-// 	s.mu.Lock()
-// 	defer s.mu.Unlock()
-// 	s.changeLogs = make([]*routingpb.ChangeRecords, changeLogLength, changeLogLength)
-// }
 
 func (s *RoutingServer) ConsumerInit(ctx context.Context, req *consumerpb.ConsumerInitRequest) (*consumerpb.ConsumerInitReply, error) {
 	group, err := s.getTargetRouting(ctx, req.GetGroupName(), req.GetHostName())
@@ -312,30 +289,3 @@ func (s *RoutingServer) getTargetRouting(ctx context.Context, groupName string, 
 	}
 	return group, nil
 }
-
-// func (s *RoutingServer) ConsumerUpdate(ctx context.Context, req *consumerpb.ConsumerUpdateRequest) (*consumerpb.ConsumerUpdateReply, error) {
-// 	// consumer版本号过低，直接发全量的新表
-// 	if dif > 2 || req.GetVersion() == 0 {
-// 		mlog.Info("consumer version too low, dispatch all routing table")
-// 		group, version, err := s.getTargetRouting(ctx, req.GetGroupName(), req.GetHostName())
-// 		if err != nil {
-// 			mlog.Errorf("failed to return init routing table: %v", err)
-// 			return nil, util.ErrorWithPos(err)
-// 		}
-// 		return &consumerpb.ConsumerUpdateReply{
-// 			Version:  version,
-// 			Outdated: true,
-// 			Group:    group,
-// 		}, nil
-// 	} else if dif < 0 {
-// 		mlog.Fatal("routing server version too low")
-// 	}
-
-// 	// resp := &consumerpb.ConsumerUpdateReply{}
-// 	// s.mu.RLock()
-// 	// for i := int64(0); i < dif; i++ {
-
-// 	// }
-
-// 	return nil, nil
-// }
