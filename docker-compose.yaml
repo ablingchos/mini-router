@@ -1,23 +1,23 @@
 version: '3'
 services:
-  # etcd:
-  #   image: quay.io/coreos/etcd
-  #   container_name: etcd
-  #   ports:
-  #     - "2379:2379"
-  #     - "2380:2380"
-  #   command: >
-  #     /usr/local/bin/etcd
-  #     --name etcd0
-  #     --data-dir /etcd-data
-  #     --listen-client-urls http://0.0.0.0:2379
-  #     --advertise-client-urls http://0.0.0.0:2379
-  #     --listen-peer-urls http://0.0.0.0:2380
-  #     --initial-advertise-peer-urls http://0.0.0.0:2380
-  #     --initial-cluster etcd0=http://0.0.0.0:2380
-  #     --initial-cluster-token etcd-cluster-1
-  #     --initial-cluster-state new
-  #     --max-request-bytes=10485760
+  etcd:
+    image: quay.io/coreos/etcd
+    container_name: etcd
+    ports:
+      - "2379:2379"
+      - "2380:2380"
+    command: >
+      /usr/local/bin/etcd
+      --name etcd0
+      --data-dir /etcd-data
+      --listen-client-urls http://0.0.0.0:2379
+      --advertise-client-urls http://0.0.0.0:2379
+      --listen-peer-urls http://0.0.0.0:2380
+      --initial-advertise-peer-urls http://0.0.0.0:2380
+      --initial-cluster etcd0=http://0.0.0.0:2380
+      --initial-cluster-token etcd-cluster-1
+      --initial-cluster-state new
+      --max-request-bytes=10485760
 
   prometheus:
     image: prom/prometheus:latest
@@ -29,38 +29,48 @@ services:
     ports:
       - "9090:9090"
 
-  influxdb:
-    image: influxdb:latest
-    container_name: influxdb
-    environment:
-      - INFLUXDB_DB=prometheus
-      - INFLUXDB_USER=influxdb
-      - INFLUXDB_USER_PASSWORD=influxdb
+  redis:
+    image: redis:latest
+    container_name: redis_container
     ports:
-      - "8086:8086"
-
-  adapter:
-    image: prom/influxdb-exporter:latest
-    container_name: adapter
-    command:
-      - '--influxdb.url=http://influxdb:8086'
-      - '--influxdb.user=influxdb'
-      - '--influxdb.user-password=influxdb'
-      - '--influxdb.db=prometheus'
-    ports:
-      - "9201:9201"
-
-  grafana:
-    image: grafana/grafana:8.3.3
-    container_name: grafana
-    restart: always
-    ports:
-      - 3000:3000
+      - "6379:6379"
     volumes:
-      - grafana-data:/var/lib/grafana
-    depends_on:
-      - influxdb
+      - redis_data:/data
+
+  # influxdb:
+  #   image: influxdb:latest
+  #   container_name: influxdb
+  #   environment:
+  #     - INFLUXDB_DB=prometheus
+  #     - INFLUXDB_USER=influxdb
+  #     - INFLUXDB_USER_PASSWORD=influxdb
+  #   ports:
+  #     - "8086:8086"
+
+  # adapter:
+  #   image: prom/influxdb-exporter:latest
+  #   container_name: adapter
+  #   command:
+  #     - '--influxdb.url=http://influxdb:8086'
+  #     - '--influxdb.user=influxdb'
+  #     - '--influxdb.user-password=influxdb'
+  #     - '--influxdb.db=prometheus'
+  #   ports:
+  #     - "9201:9201"
+
+  # grafana:
+  #   image: grafana/grafana:8.3.3
+  #   container_name: grafana
+  #   restart: always
+  #   ports:
+  #     - 3000:3000
+  #   volumes:
+  #     - grafana-data:/var/lib/grafana
+  #   depends_on:
+  #     - influxdb
 
 volumes:
-  influxdb-data:
   grafana-data:
+  redis_data:
+  # influxdb-data:
+
