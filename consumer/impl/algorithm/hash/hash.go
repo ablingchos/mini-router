@@ -85,7 +85,7 @@ func (h *HashRing) searchKey(hash uint32) int {
 // removeKey 移除哈希环中的键
 func (h *HashRing) removeKey(key uint32) {
 	idx := sort.Search(len(h.sortedKeys), func(i int) bool {
-		return h.sortedKeys[i] == key
+		return h.sortedKeys[i] >= key
 	})
 	if idx < len(h.sortedKeys) && h.sortedKeys[idx] == key {
 		h.sortedKeys = append(h.sortedKeys[:idx], h.sortedKeys[idx+1:]...)

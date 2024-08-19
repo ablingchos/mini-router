@@ -12,6 +12,7 @@ import (
 	"go.uber.org/zap"
 )
 
+// 新建一个sdk
 func NewConsumer(configPath string, virtualNode int) (*Consumer, error) {
 	var err error
 	once.Do(func() {
@@ -30,6 +31,7 @@ func NewConsumer(configPath string, virtualNode int) (*Consumer, error) {
 	return consumer, nil
 }
 
+// 向控制面初始化并启动sdk
 func (c *Consumer) Init() error {
 	resp, err := c.discoverClient.ConsumerInit(c.ctx, &consumerpb.ConsumerInitRequest{
 		GroupName: c.groupName,
@@ -43,6 +45,7 @@ func (c *Consumer) Init() error {
 	return nil
 }
 
+// graceful stop
 func (c *Consumer) Stop() {
 	c.cancel()
 	mlog.Info("received consumer stop signal, start to shutdown")
@@ -56,9 +59,8 @@ func (c *Consumer) GetEndpoints(hostName string) ([]string, error) {
 	if _, ok := c.routingTable.Hosts[hostName]; !ok {
 		return nil, util.ErrorfWithPos("no such host in routing table")
 	}
-	host := c.routingTable.Hosts[hostName]
-	for _, endpoint := range host.Endpoints {
-		resp = append(resp, endpoint.GetIp()+":"+endpoint.GetPort())
+	for _, endpoint := range c.routingTable.GetHosts()[hostName].GetEndpoints() {
+		resp = append(resp, combineAddr(endpoint.GetIp(), endpoint.GetPort()))
 	}
 
 	return resp, nil
@@ -82,15 +84,16 @@ func (c *Consumer) GetTargetEndpoint(hostName string, key string) (string, error
 	return target, nil
 }
 
-// 设置路由规则
+// 设置kv路由规则
 func (c *Consumer) SetRule(hostName string, rule *routingpb.UserRule, timoeout time.Duration) {
-	host := &routingpb.Host{
-		Name:     hostName,
-		UserRule: rule,
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	host, ok := c.routingTable.GetHosts()[hostName]
+	if !ok {
+		mlog.Errorf("no such host: %v", hostName)
+		return
 	}
-	config := c.config.Load()
-	config.GetHosts()[hostName] = host
-	c.config.Store(config)
+	host.UserRule = rule
 
-	mlog.Info("set user rule successfully", zap.Any("user rule", host))
+	mlog.Info("set user rule successfully", zap.Any("user rule", host.GetUserRule()))
 }

@@ -1,17 +1,20 @@
 name: test  # 路由组名称（类似namespace的概念）
 hosts:
   test1:
+    # 基本路由规则
     routing_rule:
       # random          = 0;  // 随机
       # consistent_hash = 1;  // 一致性哈希
       # weight          = 2;  // 权重
       # target          = 3;  // 指定目标
-      lb: 3
-      target: "9.134.78.221:10002"
-    # routing_rule: random  # 标准路由规则
+      lb: 1
+      # 一致性哈希只支持前缀匹配的哈希，如target中指定"gid-","uid-"
+      target: "eid-"
   test2:
-    user_rule:
+    user_rule: # 用户指定的路由规则，可在配置中指定，也可在接口中指定（会覆盖旧的）
       match_rule:
+        # prefix = 0;  // 前缀匹配
+        # exact  = 1;  // 完全匹配
         match: 0
         content: "eid-"  # 匹配内容
     # routing_rule: random  # 标准路由规则

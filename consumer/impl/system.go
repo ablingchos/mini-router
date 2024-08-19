@@ -93,23 +93,28 @@ func (c *Consumer) initRoutingTable(routingTable *routingpb.Group) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.routingTable = routingTable
-	for _, host := range config.GetHosts() {
-		hostName := host.GetName()
-		c.routingTable.Hosts[hostName].RoutingRule = host.GetRoutingRule()
-		c.routingTable.Hosts[hostName].UserRule = host.GetUserRule()
+
+	for hostName, host := range config.GetHosts() {
+		if _, ok := c.routingTable.GetHosts()[hostName]; !ok {
+			mlog.Panicf("no such host: %v", hostName)
+		}
+		c.routingTable.Hosts[hostName].RoutingRule = &routingpb.RoutingRule{
+			Lb:     host.GetRoutingRule().GetLb(),
+			Target: host.GetRoutingRule().GetTarget(),
+		}
+		c.routingTable.Hosts[hostName].UserRule = &routingpb.UserRule{
+			MatchRule:   host.GetUserRule().GetMatchRule(),
+			Destination: host.GetUserRule().GetDestination(),
+		}
 	}
+
 	go c.inithashRing()
 	go c.streamWatch()
-	// mlog.Debug("cover routing table successfully", zap.Any("routing table", routingTable), zap.Any("version", version))
-}
-
-// TODO: 增量更新
-func (c *Consumer) processRoutingTable(log *routingpb.ChangeRecords) {
-
+	mlog.Debug("init routing table successfully", zap.Any("routing table", routingTable))
 }
 
 func (c *Consumer) reportMetrics() {
-	c.metrics = NewMetrics("1")
+	c.metrics = NewMetrics("consumer")
 	c.metrics.Start(metricsAddr)
 }
 
@@ -141,7 +146,7 @@ func (c *Consumer) consistenthashRouting(hostName string, key string, target str
 	if !strings.HasPrefix(key, target) {
 		return "", util.ErrorfWithPos("wrong prefix, need: %v, actual: %v", target, key)
 	}
-	return ring[hostName].GetNode(strings.TrimPrefix(key, target)), nil
+	return ring[hostName].GetNode(key), nil
 }
 
 func (c *Consumer) streamWatch() {
@@ -221,6 +226,7 @@ func (c *Consumer) processDeleteEndpoint(deleteKey []string) {
 		mlog.Infof("delete offline endpoint [%v %v]", parts[0], eid)
 	}
 
+	c.hashRing.Store(&hash)
 }
 
 func parseKey(key string) (string, string, string, error) {

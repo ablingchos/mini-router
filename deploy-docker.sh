@@ -9,5 +9,14 @@ else
     echo "No existing etcd container found."
 fi
 
+# 检查是否启动了redis
+if [ "$(docker ps -q -f name=redis)" ]; then
+    echo "Stopping and removing existing redis container..."
+    docker stop redis
+    docker rm redis
+else
+    echo "No existing redis container found."
+fi
+
 docker-compose up -d
-echo "New etcd container started."
+echo "New redis container started."

@@ -106,7 +106,6 @@ func (m *Metrics) Start(addr string) {
 	ticker := time.NewTicker(5 * time.Second)
 	for range ticker.C {
 		m.Tick()
-		mlog.Debug("tick complete")
 	}
 }
 

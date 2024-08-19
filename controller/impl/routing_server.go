@@ -140,10 +140,14 @@ func (s *RoutingServer) RoutingChange(req *consumerpb.RoutingChangeRequest, stre
 
 	// 从 streams 列表中移除断开连接的客户端
 	s.mu.Lock()
-	lo.DropWhile(s.streams, func(item consumerpb.ConsumerService_RoutingChangeServer) bool {
-		return item == stream
-	})
-	s.mu.Unlock()
+	defer s.mu.Unlock()
+
+	index := lo.IndexOf(s.streams, stream)
+	if index == -1 {
+		mlog.Errorf("no such stream: %v", stream)
+		return nil
+	}
+	s.streams = append(s.streams[:index], s.streams[index+1:]...)
 
 	return nil
 }
@@ -253,6 +257,7 @@ func (s *RoutingServer) ConsumerInit(ctx context.Context, req *consumerpb.Consum
 		mlog.Errorf("failed to init consumer: %v", err)
 		return nil, util.ErrorWithPos(err)
 	}
+	mlog.Debugf("resp; %v", group)
 	return &consumerpb.ConsumerInitReply{
 		Group: group,
 	}, nil

@@ -53,3 +53,5 @@ replace git.woa.com/kefuai/mini-router/consumer => ./consumer
 replace git.woa.com/kefuai/mini-router/provider => ./provider
 
 replace git.woa.com/kefuai/mini-router/controller => ./controller
+
+replace git.woa.com/kefuai/mini-router/pkg => ./pkg

@@ -18,6 +18,7 @@ func NewProvider(configPath string) (*Provider, error) {
 	return provider, nil
 }
 
+// 测试用
 func NewproviderForTest(port string, eid int64) (*Provider, error) {
 	p := &Provider{}
 	if err := p.initializeProviderForTest(port, eid); err != nil {
@@ -26,7 +27,7 @@ func NewproviderForTest(port string, eid int64) (*Provider, error) {
 	return p, nil
 }
 
-// 被调方注册
+// 向控制面注册并运行sdk
 func (p *Provider) Run() error {
 	return p.register()
 }
