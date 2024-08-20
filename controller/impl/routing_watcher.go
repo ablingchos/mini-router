@@ -183,8 +183,11 @@ func (r *RoutingWatcher) updateRouting(addedEndpoints map[string]*routingpb.Endp
 }
 
 func (r *RoutingWatcher) processAdd(addedEndpoints map[string]*routingpb.Endpoint) {
-	grouped := make(map[string]map[string]string)
+	if len(addedEndpoints) == 0 {
+		return
+	}
 
+	grouped := make(map[string]map[string]string)
 	for key, endpoint := range addedEndpoints {
 		key = strings.TrimPrefix(key, "/")
 		parts := strings.Split(key, "/")
@@ -214,6 +217,10 @@ func (r *RoutingWatcher) processAdd(addedEndpoints map[string]*routingpb.Endpoin
 }
 
 func (r *RoutingWatcher) processDelete(deletedEndpoints map[string]struct{}) {
+	if len(deletedEndpoints) == 0 {
+		return
+	}
+
 	grouped := make(map[string][]string)
 	for key := range deletedEndpoints {
 		key = strings.TrimPrefix(key, "/")

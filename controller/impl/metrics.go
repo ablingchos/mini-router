@@ -18,8 +18,7 @@ import (
 )
 
 type Metrics struct {
-	grpc_request       prometheus.Counter
-	server_number      prometheus.Counter
+	server_number      prometheus.Gauge
 	routing_table_size prometheus.Gauge
 
 	p_cpu          prometheus.Gauge
@@ -33,11 +32,7 @@ type Metrics struct {
 
 func NewMetrics(id string) *Metrics {
 	return &Metrics{
-		grpc_request: prometheus.NewCounter(prometheus.CounterOpts{
-			Name: "quest_number_" + id,
-			Help: "Total quest number",
-		}),
-		server_number: prometheus.NewCounter(prometheus.CounterOpts{
+		server_number: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "server_number_" + id,
 			Help: "Total register number",
 		}),
@@ -77,20 +72,12 @@ func NewMetrics(id string) *Metrics {
 	}
 }
 
-func (m *Metrics) incrQuestNumber() {
-	m.grpc_request.Inc()
-}
-
 func (m *Metrics) incrServerNumber() {
 	m.server_number.Inc()
 }
 
 func (m *Metrics) descServerNumber() {
-	m.server_number.Desc()
-}
-
-func (m *Metrics) setRoutingTableSize(size int64) {
-	m.routing_table_size.Set(float64(size))
+	m.server_number.Dec()
 }
 
 func (m *Metrics) Start(addr string) {
@@ -104,7 +91,6 @@ func (m *Metrics) Start(addr string) {
 	}
 	port = strconv.Itoa(port_i + 1000)
 
-	prometheus.MustRegister(m.grpc_request)
 	prometheus.MustRegister(m.server_number)
 	prometheus.MustRegister(m.p_cpu)
 	prometheus.MustRegister(m.p_mem)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"math/rand"
+	_ "net/http/pprof"
 	"strconv"
 	"strings"
 	"sync"

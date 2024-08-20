@@ -16,6 +16,8 @@
 #   esac
 # done
 
+rm ./log/*.txt
+
 go run ./cmd/health_checker/main.go > ./log/health_checker.txt 2>&1 & #port:6100
 go run ./cmd/routing_server/main.go > ./log/routing_server.txt 2>&1 & #port:6200
 go run ./cmd/routing_watcher/main.go > ./log/routing_watcher.txt 2>&1 & #port:6300

@@ -107,7 +107,6 @@ func (r *RegisterServer) Run() {
 }
 
 func (r *RegisterServer) Heartbeat(ctx context.Context, req *providerpb.HeartbeatRequest) (*providerpb.HeartbeatReply, error) {
-	r.metrics.incrQuestNumber()
 	// keep alive
 	if _, err := r.etcdClient.KeepAliveOnce(ctx, clientv3.LeaseID(req.GetLeaseId())); err != nil {
 		mlog.Errorf("failed to keep alive endpoint: [%v %v %v], leaseid: %v", req.GetGroupName(), req.GetHostName(), req.GetEid(), req.GetLeaseId())
@@ -118,7 +117,6 @@ func (r *RegisterServer) Heartbeat(ctx context.Context, req *providerpb.Heartbea
 }
 
 func (r *RegisterServer) Unregister(ctx context.Context, req *providerpb.UnregisterRequest) (*providerpb.UnregisterReply, error) {
-	r.metrics.incrQuestNumber()
 	if _, err := r.etcdClient.Revoke(ctx, clientv3.LeaseID(req.GetLeaseId())); err != nil {
 		return nil, util.ErrorWithPos(err)
 	}
