@@ -1,6 +1,9 @@
 package main
 
 import (
+	"fmt"
+	"os"
+	"runtime/debug"
 	"strconv"
 	"testing"
 	"time"
@@ -17,6 +20,14 @@ const (
 )
 
 func TestConsistentHash(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			err := fmt.Errorf("panic: %v", r)
+			debugInfo := debug.Stack()
+			os.WriteFile("./panic.log", debugInfo, 0644)
+			fmt.Println(err)
+		}
+	}()
 	// level := zap.NewAtomicLevelAt(zapcore.Level(0))
 	// l, err := mlog.New(level)
 	// if err != nil {

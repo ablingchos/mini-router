@@ -38,12 +38,10 @@ type Consumer struct {
 	config       atomic.Pointer[routingpb.Group]
 	groupName    string
 	hostName     []string
-	hostMap      map[string]struct{}
 	ctx          context.Context
 	cancel       context.CancelFunc
 	routingTable *routingpb.Group
 	mu           sync.RWMutex
-	version      int64
 	virtualNode  int
 	metrics      *Metrics
 
@@ -182,7 +180,7 @@ func (c *Consumer) processStream(resp *consumerpb.RoutingChangeReply) error {
 		if groupName != config.GetName() || config.GetHosts()[hostName] == nil {
 			continue
 		}
-		added = append(added, hostName+"/"+eid)
+		added = append(added, groupName+"/"+hostName+"/"+eid)
 	}
 	c.processAddEndpoint(added)
 
@@ -203,11 +201,45 @@ func (c *Consumer) processStream(resp *consumerpb.RoutingChangeReply) error {
 }
 
 func (c *Consumer) processAddEndpoint(addKey []string) {
+	resp, err := c.discoverClient.PullEndpoint(c.ctx, &consumerpb.PullEndpointRequest{
+		Endpoints: addKey,
+	})
+	if err != nil {
+		mlog.Errorf("failed to add endpoints: %v", err)
+		return
+	}
 
+	for key, endpoint := range resp.GetEndpoints() {
+		_, hostName, _, err := parseKey(key)
+		if err != nil {
+			mlog.Errorf("failed to parse key: %v", err)
+			continue
+		}
+		c.insertEndpoint(hostName, endpoint)
+	}
 }
 
-func (c *Consumer) processAddHashRing(deleteKey []string) {
+func (c *Consumer) insertEndpoint(hostName string, endpoint *routingpb.Endpoint) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	routing := c.routingTable
+	if _, ok := routing.GetHosts()[hostName]; !ok {
+		mlog.Debugf("host not exists: %v", hostName)
+		return
+	}
+	host := routing.GetHosts()[hostName]
 
+	if _, ok := host.GetEndpoints()[endpoint.GetEid()]; ok {
+		mlog.Debugf("endpoint exists: %v", endpoint)
+		return
+	}
+
+	host.Endpoints[endpoint.GetEid()] = endpoint
+
+	hash := *(c.hashRing.Load())
+	hash[hostName].AddNode(strconv.Itoa(int(endpoint.GetEid())))
+	c.hashRing.Store(&hash)
+	mlog.Infof("delete offline endpoint [%v %v]", hostName, endpoint.GetEid())
 }
 
 func (c *Consumer) processDeleteEndpoint(deleteKey []string) {
@@ -256,6 +288,9 @@ func (c *Consumer) getTargetByKey(hostName string, key string) (string, error) {
 		eidStr, err := c.consistenthashRouting(hostName, key, host.GetRoutingRule().GetTarget())
 		if err != nil {
 			return "", util.ErrorWithPos(err)
+		}
+		if eidStr == "" {
+			return "", util.ErrorfWithPos("target host is empty")
 		}
 		eid, err := strconv.Atoi(eidStr)
 		if err != nil {

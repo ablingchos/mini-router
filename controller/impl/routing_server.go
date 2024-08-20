@@ -229,7 +229,7 @@ func (s *RoutingServer) PullEndpoint(ctx context.Context, req *consumerpb.PullEn
 	}
 	for key, eidStr := range eids {
 		eid, _ := strconv.Atoi(eidStr)
-		resp.Endpoints[key+eidStr] = host[key].GetEndpoints()[int64(eid)]
+		resp.Endpoints[key+"/"+eidStr] = host[key].GetEndpoints()[int64(eid)]
 	}
 	return resp, nil
 }
@@ -252,7 +252,7 @@ func (s *RoutingServer) addLocalCache(hostKey string, eid int64, endpoint *routi
 }
 
 func (s *RoutingServer) ConsumerInit(ctx context.Context, req *consumerpb.ConsumerInitRequest) (*consumerpb.ConsumerInitReply, error) {
-	group, err := s.getTargetRouting(ctx, req.GetGroupName(), req.GetHostName())
+	group, err := s.getTargetRouting(req.GetGroupName(), req.GetHostName())
 	if err != nil {
 		mlog.Errorf("failed to init consumer: %v", err)
 		return nil, util.ErrorWithPos(err)
@@ -278,7 +278,7 @@ func (s *RoutingServer) getHost(groupName string, hostName string) (*routingpb.H
 	return host, err
 }
 
-func (s *RoutingServer) getTargetRouting(ctx context.Context, groupName string, hosts []string) (*routingpb.Group, error) {
+func (s *RoutingServer) getTargetRouting(groupName string, hosts []string) (*routingpb.Group, error) {
 	// recover
 	group := &routingpb.Group{
 		Name:  groupName,

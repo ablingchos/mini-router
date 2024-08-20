@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"strings"
-	"sync"
 	"time"
 
 	"git.woa.com/kefuai/mini-router/pkg/common"
@@ -32,13 +31,10 @@ type RoutingWatcher struct {
 	etcdClient   *clientv3.Client
 	redisClient  *redis.Client
 	routingTable *common.RoutingTable
-	mu           sync.RWMutex
-	// version      atomic.Int64 // routing table的version = log的version + 1
-	logWriter  *LogWriter
-	ctx        context.Context
-	cancelFunc context.CancelFunc
-	loc        *time.Location
-	metrics    *Metrics
+	ctx          context.Context
+	cancelFunc   context.CancelFunc
+	loc          *time.Location
+	metrics      *Metrics
 }
 
 func NewRoutingWatcher() (*RoutingWatcher, error) {
@@ -67,7 +63,6 @@ func NewRoutingWatcher() (*RoutingWatcher, error) {
 	routingWatcher.redisClient = redis
 	routingWatcher.loc = loc
 	routingWatcher.etcdClient = etcd
-	routingWatcher.logWriter = NewLogWriter()
 	ctx, cancel := context.WithCancel(context.Background())
 	routingWatcher.ctx = ctx
 	routingWatcher.cancelFunc = cancel

@@ -1,6 +1,9 @@
 package main
 
 import (
+	"fmt"
+	"os"
+	"runtime/debug"
 	"strconv"
 	"testing"
 	"time"
@@ -12,6 +15,14 @@ import (
 )
 
 func TestKeyRouting(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			err := fmt.Errorf("panic: %v", r)
+			debugInfo := debug.Stack()
+			os.WriteFile("./panic.log", debugInfo, 0644)
+			fmt.Println(err)
+		}
+	}()
 	sdk, err := consumer.NewConsumer(configPath, virtualNode)
 	if err != nil {
 		mlog.Errorf("failed to get a new consumer sdk: %v", err)

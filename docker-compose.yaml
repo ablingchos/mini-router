@@ -2,6 +2,11 @@ version: '3'
 services:
   etcd:
     image: quay.io/coreos/etcd
+    deploy:
+      resources:
+        limits:
+          cpus: '2'  # 限制 CPU 使用率为 50%
+          memory: 512M  
     container_name: etcd
     ports:
       - "2379:2379"
