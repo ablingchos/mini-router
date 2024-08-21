@@ -22,9 +22,8 @@ import (
 )
 
 const (
-	pullInterval      = 3
-	routingServerPort = ":5200"
-	cacheSize         = 100
+	pullInterval = 3
+	cacheSize    = 100
 )
 
 type RoutingServer struct {
@@ -38,15 +37,17 @@ type RoutingServer struct {
 	streams      []consumerpb.ConsumerService_RoutingChangeServer
 	mu           sync.RWMutex
 	metrics      *Metrics
+	Port         string
 
 	consumerpb.UnimplementedConsumerServiceServer
 }
 
-func NewRoutingServer() (*RoutingServer, error) {
+func NewRoutingServer(port string) (*RoutingServer, error) {
 	server := &RoutingServer{
 		routingCache: make([]string, 0, cacheSize),
 		cacheMap:     make(map[string]*routingpb.Host, cacheSize),
 		metrics:      NewMetrics("routing_server"),
+		Port:         port,
 	}
 	client, err := clientv3.New(clientv3.Config{
 		Endpoints:   []string{etcdUri},
@@ -71,7 +72,7 @@ func NewRoutingServer() (*RoutingServer, error) {
 }
 
 func (s *RoutingServer) Run() {
-	go s.metrics.Start("localhost" + routingServerPort)
+	go s.metrics.Start("localhost" + s.Port)
 	go s.serveGrpc()
 	go s.watchLoop()
 }
@@ -81,7 +82,7 @@ func (s *RoutingServer) Stop() {
 }
 
 func (s *RoutingServer) serveGrpc() {
-	lis, err := net.Listen("tcp", routingServerPort)
+	lis, err := net.Listen("tcp", s.Port)
 	if err != nil {
 		mlog.Fatalf("failed to start grpc server: %v", err)
 	}

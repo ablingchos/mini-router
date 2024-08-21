@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"runtime/debug"
@@ -11,7 +12,13 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+var (
+	port = flag.String("port", ":5100", "port")
+)
+
 func main() {
+	flag.Parse()
+
 	defer func() {
 		if r := recover(); r != nil {
 			err := fmt.Errorf("panic: %v", r)
@@ -26,7 +33,7 @@ func main() {
 		mlog.Errorf("Fail", zap.Error(err))
 	}
 	mlog.SetL(l)
-	server, err := controller.NewRegisterServer()
+	server, err := controller.NewRegisterServer(*port)
 	if err != nil {
 		mlog.Fatal("failed to start register server")
 	}

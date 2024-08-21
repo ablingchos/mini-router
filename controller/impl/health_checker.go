@@ -22,19 +22,20 @@ const (
 	idMutexKey          = "/mutex/id"
 	idKey               = "/id"
 	routingHeartbeatKey = "/heartbeat"
-	healthCheckPort     = ":5100"
 )
 
 type RegisterServer struct {
 	etcdClient *clientv3.Client
 	metrics    *Metrics
+	Port       string
 
 	providerpb.UnimplementedProviderServiceServer
 }
 
-func NewRegisterServer() (*RegisterServer, error) {
+func NewRegisterServer(port string) (*RegisterServer, error) {
 	registerServer := &RegisterServer{
 		metrics: NewMetrics("health_checker"),
+		Port:    port,
 	}
 	client, err := clientv3.New(clientv3.Config{
 		Endpoints:   []string{etcdUri},
@@ -93,10 +94,10 @@ func (r *RegisterServer) Register(ctx context.Context, req *providerpb.RegisterR
 }
 
 func (r *RegisterServer) Run() {
-	go r.metrics.Start("localhost" + healthCheckPort)
-	lis, err := net.Listen("tcp", healthCheckPort)
+	go r.metrics.Start("localhost" + r.Port)
+	lis, err := net.Listen("tcp", r.Port)
 	if err != nil {
-		mlog.Fatalf("failed to listen port %v: %v", healthCheckPort, err)
+		mlog.Fatalf("failed to listen port %v: %v", r.Port, err)
 	}
 	s := grpc.NewServer()
 	providerpb.RegisterProviderServiceServer(s, r)

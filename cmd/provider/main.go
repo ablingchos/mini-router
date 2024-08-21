@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"runtime/debug"
@@ -14,23 +15,19 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+var (
+	number = flag.Int("num of jobs", 1000, "port")
+)
+
 const (
 	configPath    = "/data/home/kefuai/code_repository/mini-router/provider/impl/config1.yaml"
-	MaxGoroutines = 100  // 最大并发 goroutine 数量
-	NumJobs       = 2000 // 需要执行的任务数量
+	MaxGoroutines = 100 // 最大并发 goroutine 数量
 )
 
 func main() {
-	// sdk, err := provider.NewProvider(configPath)
-	// if err != nil {
-	// 	mlog.Errorf("failed to get a new provider sdk: %v", err)
-	// 	return
-	// }
+	flag.Parse()
+	num := *number
 
-	// if err := sdk.Run(); err != nil {
-	// 	mlog.Errorf("failed to register provider: %v", err)
-	// 	return
-	// }
 	defer func() {
 		if r := recover(); r != nil {
 			err := fmt.Errorf("panic: %v", r)
@@ -46,7 +43,7 @@ func main() {
 	}
 	mlog.SetL(l)
 
-	jobs := make(chan int, NumJobs)
+	jobs := make(chan int, num)
 
 	// 创建一个 WaitGroup 以等待所有 worker 完成
 	var wg sync.WaitGroup
@@ -59,7 +56,7 @@ func main() {
 			defer wg.Done()
 
 			for job := range jobs {
-				time.Sleep(5 * time.Millisecond)
+				time.Sleep(1 * time.Millisecond)
 
 				sdk, err := provider.NewproviderForTest(strconv.Itoa(job+10000), int64(job))
 				if err != nil {
@@ -74,7 +71,7 @@ func main() {
 	}
 
 	// 将任务添加到任务队列中
-	for i := 1; i <= NumJobs; i++ {
+	for i := 1; i <= num; i++ {
 		jobs <- i
 	}
 

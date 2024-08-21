@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"runtime/debug"
@@ -9,7 +10,12 @@ import (
 	"git.woa.com/mfcn/ms-go/pkg/mlog"
 )
 
+var (
+	port = flag.String("port", ":5100", "port")
+)
+
 func main() {
+	flag.Parse()
 	defer func() {
 		if r := recover(); r != nil {
 			err := fmt.Errorf("panic: %v", r)
@@ -18,7 +24,7 @@ func main() {
 			fmt.Println(err)
 		}
 	}()
-	server, err := controller.NewRoutingServer()
+	server, err := controller.NewRoutingServer(*port)
 	if err != nil {
 		mlog.Fatalf("failed to start routing server")
 	}

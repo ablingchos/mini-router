@@ -13,13 +13,11 @@ import (
 	"go.uber.org/zap"
 )
 
-const (
-	configPath  = "/data/home/kefuai/code_repository/mini-router/consumer/impl/config.yaml"
-	host1       = "test1"
-	virtualNode = 3
-)
-
 func TestConsistentHash(t *testing.T) {
+	configPath := "/data/home/kefuai/code_repository/mini-router/consumer/impl/config.yaml"
+	host1 := "test1"
+	virtualNode := 3
+
 	defer func() {
 		if r := recover(); r != nil {
 			err := fmt.Errorf("panic: %v", r)

@@ -15,6 +15,10 @@ import (
 )
 
 func TestKeyRouting(t *testing.T) {
+	configPath := "/data/home/kefuai/code_repository/mini-router/consumer/impl/config.yaml"
+	host1 := "test1"
+	virtualNode := 3
+
 	defer func() {
 		if r := recover(); r != nil {
 			err := fmt.Errorf("panic: %v", r)
@@ -60,11 +64,6 @@ func TestKeyRouting(t *testing.T) {
 		resp1, err := sdk.GetTargetEndpoint(host1, "eid-"+strconv.Itoa(i))
 		if err != nil {
 			mlog.Errorf("failed to get target endpint of host [%v], err: %v", host1, err)
-		}
-		if i == 5 {
-			i = 1
-		} else {
-			i++
 		}
 		mlog.Infof("target endpoint: %v", resp1)
 	}

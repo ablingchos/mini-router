@@ -90,7 +90,6 @@ func (c *Consumer) grpcConnect() error {
 func (c *Consumer) initRoutingTable(routingTable *routingpb.Group) {
 	config := c.config.Load()
 	c.mu.Lock()
-	defer c.mu.Unlock()
 	c.routingTable = routingTable
 
 	for hostName, host := range config.GetHosts() {
@@ -106,10 +105,11 @@ func (c *Consumer) initRoutingTable(routingTable *routingpb.Group) {
 			Destination: host.GetUserRule().GetDestination(),
 		}
 	}
+	c.mu.Unlock()
+	mlog.Info("init routing table successfully", zap.Any("routing table", routingTable))
 
-	go c.inithashRing()
+	c.inithashRing()
 	go c.streamWatch()
-	mlog.Debug("init routing table successfully", zap.Any("routing table", routingTable))
 }
 
 func (c *Consumer) reportMetrics() {
@@ -271,20 +271,17 @@ func parseKey(key string) (string, string, string, error) {
 }
 
 func (c *Consumer) getTargetByKey(hostName string, key string) (string, error) {
-	defer func() {
-		c.metrics.incrQuestNumber()
-	}()
-
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	routing := c.routingTable
 	if _, ok := routing.GetHosts()[hostName]; !ok {
-		c.metrics.incrFailNumber()
 		return "", util.ErrorfWithPos("no such host [%v] in routing table", hostName)
 	}
 	host := routing.GetHosts()[hostName]
+	strategy := host.GetUserRule()
 
-	if host.GetRoutingRule().GetLb() == routingpb.LoadBalancer_consistent_hash {
+	if host.GetRoutingRule().GetLb() == routingpb.LoadBalancer_consistent_hash && strategy.GetMatchRule().GetContent() == "" {
+		mlog.Debug("consistent_hash")
 		eidStr, err := c.consistenthashRouting(hostName, key, host.GetRoutingRule().GetTarget())
 		if err != nil {
 			return "", util.ErrorWithPos(err)
@@ -300,18 +297,18 @@ func (c *Consumer) getTargetByKey(hostName string, key string) (string, error) {
 		return combineAddr(endpoint.GetIp(), endpoint.GetPort()), nil
 	}
 
-	strategy := host.GetUserRule()
 	switch strategy.GetMatchRule().GetMatch() {
 	case routingpb.Match_prefix:
+		mlog.Debug("match_prefix")
 		if strings.HasPrefix(key, strategy.GetMatchRule().GetContent()) {
 			return combineAddr(strategy.GetDestination().GetIp(), strategy.GetDestination().GetPort()), nil
 		}
 	case routingpb.Match_exact:
+		mlog.Debug("match_exact")
 		if key == strategy.GetMatchRule().GetContent() {
 			return combineAddr(strategy.GetDestination().GetIp(), strategy.GetDestination().GetPort()), nil
 		}
 	}
-	c.metrics.incrFailNumber()
 	return "", util.ErrorfWithPos("no match rules, expect: %v, actual: %v", strategy, key)
 }
 

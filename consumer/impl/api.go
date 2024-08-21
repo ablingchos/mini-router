@@ -28,7 +28,36 @@ func NewConsumer(configPath string, virtualNode int) (*Consumer, error) {
 	if err != nil {
 		return nil, util.ErrorWithPos(err)
 	}
+	go consumer.reportMetrics()
+
 	return consumer, nil
+}
+
+// 测试用
+func NewConsumerForTest(configPath string, virtualNode int) (*Consumer, error) {
+	consumer = &Consumer{
+		hostName:    make([]string, 0),
+		hashRing:    atomic.Pointer[map[string]*consistenthash.HashRing]{},
+		virtualNode: virtualNode,
+	}
+	emptyMap := make(map[string]*consistenthash.HashRing)
+	consumer.hashRing.Store(&emptyMap)
+	if err := consumer.initializeConsumer(configPath); err != nil {
+		return nil, util.ErrorWithPos(err)
+	}
+	return consumer, nil
+}
+
+func (c *Consumer) InitForTest() error {
+	resp, err := c.discoverClient.ConsumerInit(c.ctx, &consumerpb.ConsumerInitRequest{
+		GroupName: c.groupName,
+		HostName:  c.hostName,
+	})
+	if err != nil {
+		return util.ErrorWithPos(err)
+	}
+	c.initRoutingTable(resp.GetGroup())
+	return nil
 }
 
 // 向控制面初始化并启动sdk
@@ -41,7 +70,6 @@ func (c *Consumer) Init() error {
 		return util.ErrorWithPos(err)
 	}
 	c.initRoutingTable(resp.GetGroup())
-	go c.reportMetrics()
 	return nil
 }
 
