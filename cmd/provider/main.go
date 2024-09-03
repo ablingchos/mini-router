@@ -16,7 +16,7 @@ import (
 )
 
 var (
-	number = flag.Int("num of jobs", 1000, "port")
+	number = flag.Int("number", 1000, "number")
 )
 
 const (
